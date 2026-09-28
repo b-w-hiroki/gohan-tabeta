@@ -1,14 +1,19 @@
 import {
   MEAL_TYPES, getDay, putDay, getDaysInRange, getAllDays, putPhoto, getPhoto, deletePhoto,
-  getAllPhotos, clearAll, dayTotal, mealTotal, hasContent, exerciseTotal,
+  getAllPhotos, clearAll, dayTotal, mealTotal, hasContent, exerciseTotal, useStore, localStore,
 } from './db.js';
 import { FOOD_PRESETS, EXERCISE_PRESETS } from './foods.js';
 import {
   WEEKDAYS, pad, toKey, fromKey, todayKey, addDays, uid, fmt, h, getGoal, setGoal,
   getProfile, setProfile, isProfileComplete, calcBmr, calcTdee, exerciseKcal, ACTIVITY_LEVELS,
   icon, iconSvg, parseKcal, getShortcutName, setShortcutName, DEFAULT_SHORTCUT,
+  setSettingsHook, applySettings, currentSettings,
 } from './util.js';
 import { renderDashboard } from './dashboard.js';
+import {
+  isConfigured, currentUser, cloudStore, signInGoogle, signInEmail, signUpEmail, resetPassword,
+  signOutCloud, authErrorMessage, deleteAccount,
+} from './cloud.js';
 
 const $app = document.getElementById('app');
 const $title = document.getElementById('title');
@@ -88,6 +93,7 @@ function parseRoute() {
 }
 
 async function render() {
+  if (document.body.classList.contains('auth-screen')) return; // login screen owns the page
   revokeUrls();
   const route = parseRoute();
   if (route.name === 'import') {
@@ -708,10 +714,37 @@ function renderDataPanel() {
       e.target.value = '';
     },
   });
+  const account = session.user
+    ? h('section', { class: 'card' },
+      h('h2', {}, 'アカウント'),
+      h('p', { class: 'hint' }, `${session.user.email || session.user.displayName || 'ログイン中'} でログイン中。記録はクラウドに保存され、他の端末でも同じ内容が見られます。`),
+      h('button', { class: 'secondary', onclick: async () => {
+        if (!confirm('ログアウトしますか？（記録はクラウドに残ります）')) return;
+        await signOutCloud();
+        setAuthMode(null);
+        location.reload();
+      } }, 'ログアウト'),
+      h('button', { class: 'danger', onclick: async () => {
+        if (!confirm('アカウントとクラウド上のすべての記録・写真を削除します。元に戻せません。よろしいですか？')) return;
+        if (!confirm('本当に削除しますか？')) return;
+        try {
+          await deleteAccount();
+          setAuthMode(null);
+          alert('アカウントを削除しました');
+          location.reload();
+        } catch (err) { toast(authErrorMessage(err)); }
+      } }, 'アカウントを削除'))
+    : h('section', { class: 'card' },
+      h('h2', {}, 'アカウント'),
+      h('p', { class: 'hint' }, 'ログインせずに利用中。記録はこの端末だけに保存されています。'),
+      h('button', { class: 'secondary', onclick: () => { setAuthMode(null); location.reload(); } }, 'ログインしてクラウドに保存'));
   return h('div', {},
+    account,
     h('section', { class: 'card' },
       h('h2', {}, 'バックアップ'),
-      h('p', { class: 'hint' }, 'データはこの端末内のみに保存。機種変更に備えて定期的にエクスポートしてください。'),
+      h('p', { class: 'hint' }, session.user
+        ? '念のためのバックアップや、別アカウントへの移行に使えます。'
+        : '機種変更に備えて定期的にエクスポートしてください。'),
       h('div', { class: 'row' },
         h('button', { class: 'secondary', onclick: exportData }, 'エクスポート'),
         h('label', { class: 'button secondary' }, fileInput, 'インポート'))),
@@ -720,8 +753,143 @@ function renderDataPanel() {
       h('p', { class: 'hint' }, 'iPhone: 共有 →「ホーム画面に追加」／Android: メニュー →「ホーム画面に追加」')));
 }
 
+// ---------- session: local (this device) or cloud (logged in) ----------
+const session = { user: null };
+
+function getAuthMode() {
+  try { return localStorage.getItem('authMode'); } catch { return null; }
+}
+function setAuthMode(v) {
+  try { if (v) localStorage.setItem('authMode', v); else localStorage.removeItem('authMode'); } catch { /* ignore */ }
+}
+
+async function startCloud(user) {
+  session.user = user;
+  const cloud = cloudStore(user.uid);
+  // Settings: the account's saved values win; a brand-new account starts from this device's.
+  const saved = await cloud.getSettings().catch(() => null);
+  if (saved) applySettings(saved); else await cloud.saveSettings(currentSettings()).catch(() => {});
+  setSettingsHook((patch) => cloud.saveSettings(patch).catch(() => toast('設定をクラウドに保存できませんでした')));
+  useStore(cloud);
+  setAuthMode('cloud');
+  await offerMigration(cloud);
+}
+
+// First login on a device that already has local records: offer to copy them into the account.
+async function offerMigration(cloud) {
+  let localDays = [];
+  try { localDays = await localStore.getAllDays(); } catch { return; }
+  if (!localDays.length) return;
+  let migratedKey = `migrated:${session.user.uid}`;
+  try { if (localStorage.getItem(migratedKey)) return; } catch { /* ignore */ }
+  if (await cloud.hasAnyDay()) return;
+  if (!confirm(`この端末に${localDays.length}日分の記録があります。アカウントに保存しますか？`)) {
+    try { localStorage.setItem(migratedKey, 'skipped'); } catch { /* ignore */ }
+    return;
+  }
+  toast('記録をアカウントに保存しています…');
+  for (const d of localDays) await cloud.putDay(d);
+  for (const p of await localStore.getAllPhotos()) await cloud.putPhoto(p);
+  try { localStorage.setItem(migratedKey, 'done'); } catch { /* ignore */ }
+  toast(`${localDays.length}日分の記録を保存しました`);
+}
+
+// ---------- login screen ----------
+function renderLogin() {
+  document.body.classList.add('auth-screen');
+  let mode = 'login';
+  const configured = isConfigured();
+  const email = h('input', { type: 'email', placeholder: 'メールアドレス', autocomplete: 'email', 'aria-label': 'メールアドレス' });
+  const password = h('input', { type: 'password', placeholder: 'パスワード（6文字以上）', autocomplete: 'current-password', 'aria-label': 'パスワード' });
+  const error = h('p', { class: 'auth-error', role: 'alert', hidden: true });
+  const submit = h('button', { class: 'primary block', type: 'submit' }, 'ログイン');
+  const toggle = h('button', { type: 'button', class: 'text-btn' });
+  const note = h('p', { class: 'auth-note' });
+
+  const busy = (on) => { for (const b of form.querySelectorAll('button')) b.disabled = on; };
+  const fail = (e) => { error.textContent = typeof e === 'string' ? e : authErrorMessage(e); error.hidden = false; busy(false); };
+  const done = async (user) => {
+    if (!user) return; // redirect flow continues after reload
+    document.body.classList.remove('auth-screen');
+    await startCloud(user);
+    location.hash = '#/today';
+    render();
+  };
+  const setMode = (m) => {
+    mode = m;
+    submit.textContent = m === 'login' ? 'ログイン' : '新規登録';
+    password.autocomplete = m === 'login' ? 'current-password' : 'new-password';
+    toggle.textContent = m === 'login' ? 'はじめての方は新規登録' : 'アカウントをお持ちの方はログイン';
+    note.textContent = m === 'login' ? '' : '登録すると、プライバシーポリシーに同意したものとみなします。';
+    error.hidden = true;
+  };
+  toggle.addEventListener('click', () => setMode(mode === 'login' ? 'signup' : 'login'));
+
+  const form = h('form', { class: 'auth-card', onsubmit: async (e) => {
+    e.preventDefault();
+    if (!configured) return;
+    busy(true); error.hidden = true;
+    try {
+      await done(mode === 'login' ? await signInEmail(email.value.trim(), password.value)
+        : await signUpEmail(email.value.trim(), password.value));
+    } catch (err) { fail(err); }
+  } },
+  h('button', { type: 'button', class: 'google-btn', disabled: !configured, onclick: async () => {
+    busy(true); error.hidden = true;
+    try { await done(await signInGoogle()); } catch (err) { fail(err); }
+  } }, googleMark(), 'Googleでログイン'),
+  h('div', { class: 'auth-divider' }, h('span', {}, 'または')),
+  email, password, submit, error,
+  h('div', { class: 'auth-links' }, toggle,
+    h('button', { type: 'button', class: 'text-btn', onclick: async () => {
+      if (!email.value.trim()) { fail('パスワード再設定のメールを送るため、メールアドレスを入力してください'); return; }
+      try { await resetPassword(email.value.trim()); toast('再設定メールを送りました'); } catch (err) { fail(err); }
+    } }, 'パスワードを忘れた')),
+  note,
+  configured ? null : h('p', { class: 'auth-notice' }, 'クラウド保存は準備中です。今は「ログインせずに使う」で利用できます。'));
+  if (!configured) for (const el of [email, password, submit]) el.disabled = true;
+  setMode('login');
+
+  $app.replaceChildren(h('div', { class: 'auth' },
+    h('div', { class: 'auth-hero' },
+      h('img', { src: 'icons/icon.svg', alt: '', class: 'auth-logo', width: 72, height: 72 }),
+      h('h1', {}, 'ごはん食べた'),
+      h('p', {}, '食べたものを、カレンダーにぽんっと記録。')),
+    form,
+    h('div', { class: 'auth-guest' },
+      h('button', { type: 'button', class: 'secondary block', onclick: () => {
+        setAuthMode('local');
+        document.body.classList.remove('auth-screen');
+        render();
+      } }, 'ログインせずに使う'),
+      h('small', {}, 'ログインしない場合、記録はこの端末だけに保存されます。ログインすると機種変更や複数の端末でも記録を引き継げます。')),
+    h('p', { class: 'auth-footer' },
+      h('a', { href: './' }, 'ごはん食べたについて'), ' ・ ', h('a', { href: './privacy.html' }, 'プライバシーポリシー'))));
+}
+
+function googleMark() {
+  const span = document.createElement('span');
+  span.className = 'icon';
+  span.innerHTML = '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
+  return span;
+}
+
 // ---------- boot ----------
-render();
+async function boot() {
+  let user = null;
+  if (isConfigured() && getAuthMode() !== 'local') {
+    try { user = await currentUser(); } catch { /* offline or SDK unavailable: fall through */ }
+  }
+  if (user) {
+    try { await startCloud(user); } catch { toast('クラウドに接続できませんでした'); }
+    render();
+  } else if (getAuthMode() === 'local') {
+    render();
+  } else {
+    renderLogin();
+  }
+}
+boot();
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }

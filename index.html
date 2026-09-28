@@ -3,35 +3,271 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <script>
+    // Installed app (or a Shortcut deep link like #/import) opens straight into the app.
+    (function () {
+      var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+      if (standalone || location.hash.length > 1) location.replace('./app.html' + location.search + location.hash);
+    })();
+  </script>
+  <title>ごはん食べた｜食べたものをカレンダーで記録する食事管理アプリ</title>
+  <meta name="description" content="朝昼晩の食事とカロリー、写真をカレンダーにぽんっと記録。週・月の振り返りや推定減量、Apple Watchの消費カロリー取り込みにも対応した無料の食事管理アプリです。">
   <meta name="theme-color" content="#fff8f1" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#1a1511" media="(prefers-color-scheme: dark)">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="ごはん食べた">
-  <meta name="description" content="日毎のカレンダーで朝昼晩の食事とカロリー、写真を記録するシンプルな食事管理ツール">
-  <title>ごはん食べた</title>
+  <meta name="theme-color" content="#17120e" media="(prefers-color-scheme: dark)">
+  <link rel="canonical" href="https://gohan-tabeta.birdman-studio.com/">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="css/style.css">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="ごはん食べた｜食べたものをカレンダーで記録">
+  <meta property="og:description" content="朝昼晩の食事とカロリー、写真をカレンダーにぽんっと記録できる無料の食事管理アプリ。">
+  <meta property="og:url" content="https://gohan-tabeta.birdman-studio.com/">
+  <meta property="og:image" content="https://gohan-tabeta.birdman-studio.com/images/screen-calendar.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700;900&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg: #fff8f1; --surface: #ffffff; --surface-2: #fdf1e6; --text: #2b2118; --muted: #6f6054;
+      --border: #efe1d3; --accent: #ea580c; --accent-ink: #c2410c; --accent-weak: #ffedd5; --on-accent: #fff;
+      --marker: #fde68a; --shadow: 0 10px 30px rgb(80 40 0 / .12);
+      --font-brand: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", sans-serif;
+      --font-body: "Noto Sans JP", -apple-system, "Hiragino Sans", sans-serif;
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #17120e; --surface: #231c17; --surface-2: #2b231d; --text: #f3ebe3; --muted: #b3a597;
+        --border: #3a3029; --accent: #f97316; --accent-ink: #fb923c; --accent-weak: #3b2616; --on-accent: #1a0f07;
+        --marker: #7c4a0a; --shadow: 0 10px 30px rgb(0 0 0 / .4);
+      }
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); line-height: 1.8; }
+    a { color: var(--accent-ink); }
+    img { max-width: 100%; display: block; }
+    .wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+
+    /* header */
+    .site-header { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 90%, transparent);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+    .site-header .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text);
+      font-family: var(--font-brand); font-weight: 900; font-size: 19px; }
+    .brand img { width: 32px; height: 32px; border-radius: 9px; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 24px;
+      border-radius: 14px; font-weight: 700; text-decoration: none; font-size: 16px; }
+    .btn-primary { background: var(--accent); color: var(--on-accent); box-shadow: 0 6px 16px rgb(234 88 12 / .3); }
+    .btn-primary:active { transform: translateY(1px); }
+    .btn-sm { min-height: 40px; padding: 0 16px; font-size: 14px; border-radius: 12px; }
+    .link { font-weight: 700; }
+
+    /* hero */
+    .hero { padding: 44px 0 24px; display: grid; gap: 32px; align-items: center; }
+    .eyebrow { margin: 0 0 12px; font-weight: 700; font-size: 14px; color: var(--muted); letter-spacing: .04em; }
+    .hero h1 { margin: 0; font-family: var(--font-brand); font-weight: 900; font-size: clamp(30px, 8.6vw, 50px); line-height: 1.35; letter-spacing: .01em; }
+    .mark { background: linear-gradient(transparent 62%, var(--marker) 62%); padding: 0 .05em; }
+    .nw { white-space: nowrap; }
+    .hero p.lead { margin: 20px 0 26px; font-size: 16px; color: var(--muted); }
+    .cta { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+    .note { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
+
+    /* phone mockups */
+    .phones { position: relative; height: calc(min(46vw, 230px) * 1.75 + 70px); max-width: 480px; width: 100%; margin: 0 auto; }
+    .phone { position: absolute; width: min(46vw, 230px); border-radius: 34px; padding: 8px; background: #1f1712;
+      box-shadow: var(--shadow); }
+    .phone img, .shot img { width: 100%; height: auto; }
+    .phone img { border-radius: 27px; aspect-ratio: 390 / 664; object-fit: cover; object-position: top; }
+    .phone.p1 { left: 50%; top: 10px; transform: translateX(-90%) rotate(-6deg); z-index: 2; }
+    .phone.p2 { left: 50%; top: 40px; transform: translateX(-6%) rotate(5deg); }
+    .bubble { position: absolute; z-index: 3; width: 64px; height: 64px; border-radius: 50%; background: var(--surface);
+      box-shadow: var(--shadow); display: grid; place-items: center; font-size: 30px; }
+    .bubble.b1 { left: 4%; top: 58%; } .bubble.b2 { right: 4%; top: 6%; } .bubble.b3 { right: 12%; bottom: 2%; }
+
+    /* sections */
+    section { padding: 56px 0; }
+    h2 { margin: 0 0 8px; font-family: var(--font-brand); font-weight: 900; font-size: clamp(26px, 6.5vw, 34px); line-height: 1.4; }
+    .sub { margin: 0 0 28px; color: var(--muted); }
+    .cards { display: grid; gap: 16px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 22px; padding: 22px; }
+    .num { font-family: var(--font-brand); font-weight: 900; color: var(--muted); font-size: 14px; letter-spacing: .1em; }
+    .card h3 { margin: 4px 0 8px; font-family: var(--font-brand); font-weight: 900; font-size: 22px; }
+    .card h3 .mark { background: linear-gradient(transparent 60%, var(--marker) 60%); }
+    .card p { margin: 0; color: var(--muted); font-size: 15px; }
+
+    .feature { display: grid; gap: 22px; align-items: center; padding: 26px 0; border-top: 1px dashed var(--border); }
+    .feature:first-of-type { border-top: 0; }
+    .feature .shot { width: 220px; margin: 0 auto; border-radius: 28px; padding: 7px; background: #1f1712; box-shadow: var(--shadow); }
+    .feature .shot img { border-radius: 22px; aspect-ratio: 390 / 664; object-fit: cover; object-position: top; }
+    .feature h3 { margin: 0 0 8px; font-family: var(--font-brand); font-weight: 900; font-size: 24px; line-height: 1.4; }
+    .feature ul { margin: 12px 0 0; padding-left: 1.2em; color: var(--muted); }
+    .tag { display: inline-block; font-size: 12px; font-weight: 700; color: var(--accent-ink); background: var(--accent-weak);
+      padding: 2px 10px; border-radius: 999px; margin-bottom: 8px; }
+    .mini { display: grid; gap: 14px; }
+    .mini .card { display: flex; gap: 14px; align-items: flex-start; }
+    .mini .ico { flex: none; width: 48px; height: 48px; border-radius: 14px; background: var(--accent-weak); display: grid; place-items: center; font-size: 24px; }
+    .mini h3 { font-size: 18px; margin: 0 0 4px; }
+
+    .steps { counter-reset: step; display: grid; gap: 14px; }
+    .step { position: relative; padding-left: 58px; }
+    .step::before { counter-increment: step; content: counter(step); position: absolute; left: 22px; top: 22px;
+      width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: var(--on-accent);
+      display: grid; place-items: center; font-weight: 900; font-size: 14px; }
+    .step h3 { font-size: 18px; }
+
+    details { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 4px 18px; }
+    details + details { margin-top: 10px; }
+    summary { cursor: pointer; font-weight: 700; padding: 12px 0; list-style: none; display: flex; justify-content: space-between; gap: 10px; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: "+"; color: var(--accent-ink); font-size: 20px; line-height: 1; }
+    details[open] summary::after { content: "−"; }
+    details p { margin: 0 0 14px; color: var(--muted); font-size: 15px; }
+
+    .final { text-align: center; background: var(--surface-2); border-radius: 28px; padding: 44px 20px; }
+    .final .cta { justify-content: center; }
+    footer { padding: 32px 0 calc(40px + env(safe-area-inset-bottom)); color: var(--muted); font-size: 13px; text-align: center; }
+    footer nav { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px; }
+    footer a { color: var(--muted); }
+
+    @media (min-width: 860px) {
+      .hero { grid-template-columns: 1.05fr 1fr; padding: 72px 0 40px; }
+      .cards { grid-template-columns: repeat(3, 1fr); }
+      .feature { grid-template-columns: 260px 1fr; gap: 48px; }
+      .feature.rev { grid-template-columns: 1fr 260px; }
+      .feature.rev .shot { order: 2; }
+      .mini { grid-template-columns: 1fr 1fr; }
+      .steps { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 480px) {
+      .phone { border-radius: 26px; padding: 6px; }
+      .phone img { border-radius: 21px; }
+      .bubble { width: 52px; height: 52px; font-size: 24px; }
+    }
+  </style>
 </head>
 <body>
-  <header class="topbar">
-    <button id="hd-left" class="icon-btn" hidden></button>
-    <div class="title-wrap">
-      <h1 id="title">ごはん食べた</h1>
-      <small id="subtitle" hidden></small>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="./"><img src="icons/icon.svg" alt="" width="32" height="32">ごはん食べた</a>
+      <a class="btn btn-primary btn-sm" href="./app.html">アプリを開く</a>
     </div>
-    <button id="hd-right" class="icon-btn" hidden></button>
   </header>
-  <main id="app"></main>
-  <nav id="bottom-nav" class="bottom-nav" aria-label="メインメニュー">
-    <a href="#/" data-nav="calendar"><span class="nav-icon" data-icon="calendar"></span>カレンダー</a>
-    <a href="#/today" data-nav="today"><span class="nav-icon" data-icon="edit"></span>今日の記録</a>
-    <a href="#/stats" data-nav="stats"><span class="nav-icon" data-icon="chart"></span>ダッシュボード</a>
-    <a href="#/settings" data-nav="settings"><span class="nav-icon" data-icon="gear"></span>設定</a>
-  </nav>
-  <script type="module" src="js/app.js"></script>
+
+  <main>
+    <div class="wrap">
+      <div class="hero">
+        <div>
+          <p class="eyebrow">カレンダーで続ける、かんたん食事記録</p>
+          <h1><span class="mark nw">「何食べたっけ？」</span><span class="nw">を、</span><br>カレンダーで<br>ひと目に。</h1>
+          <p class="lead">朝・昼・晩に食べたものをタップで記録。カロリーは自動で合計、写真も残せます。週や月の振り返り、消費カロリーとの差から「あと何kg」の目安まで、ひとつのアプリで。</p>
+          <div class="cta">
+            <a class="btn btn-primary" href="./app.html">無料ではじめる</a>
+            <a class="link" href="#features">できることを見る</a>
+          </div>
+          <p class="note">インストール不要。iPhone / Android のブラウザで開いて「ホーム画面に追加」するとアプリのように使えます。</p>
+        </div>
+        <div class="phones" aria-hidden="true">
+          <div class="phone p1"><img src="images/screen-day.jpg" alt="" width="390" height="664"></div>
+          <div class="phone p2"><img src="images/screen-calendar.jpg" alt="" width="390" height="664"></div>
+          <div class="bubble b1">🍙</div>
+          <div class="bubble b2">🥗</div>
+          <div class="bubble b3">🏃</div>
+        </div>
+      </div>
+    </div>
+
+    <section>
+      <div class="wrap">
+        <h2>こんなこと、ありませんか？</h2>
+        <p class="sub">食事の記録は、続けるのがいちばん難しい。よくあるつまずきはこの3つです。</p>
+        <div class="cards">
+          <div class="card"><div class="num">01</div><h3><span class="mark">思い出せない</span></h3><p>夜になると、朝と昼に何を食べたか曖昧に。記録がとびとびになってしまう。</p></div>
+          <div class="card"><div class="num">02</div><h3><span class="mark">計算が面倒</span></h3><p>毎回カロリーを調べて足し算するのが負担で、3日で挫折。</p></div>
+          <div class="card"><div class="num">03</div><h3><span class="mark">成果が見えない</span></h3><p>がんばっているのに、体重が変わるまで手応えがなくて続かない。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="features">
+      <div class="wrap">
+        <h2>ごはん食べた なら、ぜんぶ1画面で。</h2>
+        <p class="sub">スマホの1画面に収まるように作っています。スクロールせずに、タブとスワイプで切り替え。</p>
+
+        <div class="feature">
+          <div class="shot"><img src="images/screen-day.jpg" alt="1日の記録画面。朝食・昼食・夕食・間食・運動のタブと、品目ごとのカロリー" width="390" height="664" loading="lazy"></div>
+          <div>
+            <span class="tag">記録</span>
+            <h3>朝・昼・晩・間食を、タップで記録</h3>
+            <p>よく食べるものはボタンひとつでカロリーごと入力。料理名とカロリーを自分で入れることも、写真やメモを残すこともできます。</p>
+            <ul><li>その日の合計と目標までの残りをひと目で</li><li>写真は自動で軽くして保存</li><li>左右スワイプで食事を切り替え</li></ul>
+          </div>
+        </div>
+
+        <div class="feature rev">
+          <div class="shot"><img src="images/screen-calendar.jpg" alt="月のカレンダー。日ごとの合計カロリーと記録した食事の印" width="390" height="664" loading="lazy"></div>
+          <div>
+            <span class="tag">カレンダー</span>
+            <h3>1か月の食事が、カレンダーでひと目に</h3>
+            <p>日ごとの合計カロリーと、記録した食事・運動の印が並びます。目標を超えた日は赤字で表示。</p>
+          </div>
+        </div>
+
+        <div class="feature">
+          <div class="shot"><img src="images/screen-stats.jpg" alt="ダッシュボード。日別カロリーのグラフと推定減量" width="390" height="664" loading="lazy"></div>
+          <div>
+            <span class="tag">ダッシュボード</span>
+            <h3>週・月で振り返り、「あと何kg」の目安も</h3>
+            <p>1日平均や目標内の日数、日別のグラフで傾向がわかります。年齢・身長・体重から基礎代謝を推定し、食事と運動の差から減量の目安を計算します。</p>
+          </div>
+        </div>
+
+        <div class="mini">
+          <div class="card"><div class="ico">⌚</div><div><h3>Apple Watch の消費カロリー</h3><p>iPhoneのショートカットで、アクティブカロリーを運動記録に取り込めます。</p></div></div>
+          <div class="card"><div class="ico">☁️</div><div><h3>機種変更しても安心</h3><p>ログインすると記録はクラウドに保存。複数の端末でも同じ記録が見られます。</p></div></div>
+          <div class="card"><div class="ico">📶</div><div><h3>電波がなくても記録できる</h3><p>オフラインでも使えて、つながったときに自動で保存されます。</p></div></div>
+          <div class="card"><div class="ico">🌙</div><div><h3>ダークモード対応</h3><p>夜でもまぶしくない配色に、端末の設定に合わせて自動で切り替わります。</p></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <h2>はじめかた</h2>
+        <p class="sub">アプリストアからのインストールは不要です。</p>
+        <div class="steps">
+          <div class="card step"><h3>ブラウザで開く</h3><p>このページの「無料ではじめる」をタップ。</p></div>
+          <div class="card step"><h3>ホーム画面に追加</h3><p>iPhoneは共有ボタン、Androidはメニューから「ホーム画面に追加」。</p></div>
+          <div class="card step"><h3>ログインして記録</h3><p>Googleまたはメールでログイン。ログインせずに使うこともできます。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <h2>よくある質問</h2>
+        <details><summary>料金はかかりますか？</summary><p>無料で使えます。</p></details>
+        <details><summary>ログインしないと使えませんか？</summary><p>ログインせずに使えます。その場合、記録はお使いの端末の中だけに保存されます。機種変更や複数端末で使いたい場合はログインしてください。</p></details>
+        <details><summary>記録はどこに保存されますか？</summary><p>ログインすると、Google の Firebase（クラウド）にあなたのアカウント専用で保存されます。ほかの人が見ることはできません。詳しくは<a href="./privacy.html">プライバシーポリシー</a>をご覧ください。</p></details>
+        <details><summary>Android でも使えますか？</summary><p>使えます。Chrome で開いて「ホーム画面に追加」してください。Apple Watch 連携のみ iPhone 限定です。</p></details>
+        <details><summary>カロリーは正確ですか？</summary><p>よく食べるもののカロリーや推定減量は一般的な目安です。医療や厳密な栄養管理が必要な場合は専門家にご相談ください。</p></details>
+      </div>
+    </section>
+
+    <div class="wrap">
+      <div class="final">
+        <h2><span class="nw">今日のごはんから、</span><span class="nw">はじめよう。</span></h2>
+        <p class="sub">記録は30秒。続けるほど、自分の食べ方が見えてきます。</p>
+        <div class="cta"><a class="btn btn-primary" href="./app.html">無料ではじめる</a></div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <nav><a href="./app.html">アプリを開く</a><a href="./privacy.html">プライバシーポリシー</a></nav>
+      <p>© birdman studio</p>
+    </div>
+  </footer>
 </body>
 </html>
