@@ -33,3 +33,42 @@ export function getGoal() {
 export function setGoal(v) {
   try { localStorage.setItem('goalKcal', String(v)); } catch { /* storage unavailable */ }
 }
+
+// ---------- profile & energy estimates ----------
+export const KCAL_PER_KG = 7200; // Commonly used approximation for 1kg of body fat.
+
+// Exercise is recorded separately, so these levels describe daily life without workouts.
+export const ACTIVITY_LEVELS = [
+  { value: 1.2, label: '座り仕事が中心' },
+  { value: 1.375, label: '立ち仕事・よく歩く' },
+  { value: 1.55, label: '体を動かす仕事' },
+];
+
+export function getProfile() {
+  try { return JSON.parse(localStorage.getItem('profile')) || null; } catch { return null; }
+}
+export function setProfile(p) {
+  try { localStorage.setItem('profile', JSON.stringify(p)); } catch { /* storage unavailable */ }
+}
+
+export function isProfileComplete(p) {
+  return !!p && p.age > 0 && p.height > 0 && p.weight > 0 && (p.sex === 'male' || p.sex === 'female');
+}
+
+// Basal metabolic rate (Mifflin-St Jeor).
+export function calcBmr(p) {
+  if (!isProfileComplete(p)) return 0;
+  const base = 10 * p.weight + 6.25 * p.height - 5 * p.age;
+  return Math.round(p.sex === 'male' ? base + 5 : base - 161);
+}
+
+// Daily energy expenditure excluding recorded exercise.
+export function calcTdee(p) {
+  return Math.round(calcBmr(p) * (Number(p?.activity) || 1.2));
+}
+
+// Net extra kcal of an exercise (METs minus the resting 1 MET already counted in TDEE).
+export function exerciseKcal(mets, minutes, weight) {
+  if (!mets || !minutes || !weight) return 0;
+  return Math.max(0, Math.round((mets - 1) * weight * (minutes / 60) * 1.05));
+}

@@ -1,10 +1,11 @@
 import {
   MEAL_TYPES, getDay, putDay, getDaysInRange, getAllDays, putPhoto, getPhoto, deletePhoto,
-  getAllPhotos, clearAll, dayTotal, mealTotal, hasContent,
+  getAllPhotos, clearAll, dayTotal, mealTotal, hasContent, exerciseTotal,
 } from './db.js';
-import { FOOD_PRESETS } from './foods.js';
+import { FOOD_PRESETS, EXERCISE_PRESETS } from './foods.js';
 import {
   WEEKDAYS, pad, toKey, fromKey, todayKey, addDays, uid, fmt, h, getGoal, setGoal,
+  getProfile, setProfile, isProfileComplete, calcBmr, calcTdee, exerciseKcal, ACTIVITY_LEVELS,
 } from './util.js';
 import { renderDashboard } from './dashboard.js';
 
@@ -169,9 +170,14 @@ async function renderDay(date) {
     h('span', { class: 'tab-label' }, t.icon, ' ', t.label),
     h('span', { class: 'tab-kcal' }, sub ? fmt(sub) : hasContent(day.meals[t.id]) ? '✓' : '—'));
   });
+  const burned = exerciseTotal(day);
+  tabs.push(h('button', { class: 'tab tab-exercise', role: 'tab', onclick: () => selectTab(MEAL_TYPES.length, true) },
+    h('span', { class: 'tab-label' }, '🏃 運動'),
+    h('span', { class: 'tab-kcal' }, burned ? `-${fmt(burned)}` : day.exercises.length ? '✓' : '—')));
 
   const panels = h('div', { class: 'panels' });
   for (const type of MEAL_TYPES) panels.append(await renderMealCard(day, type, save));
+  panels.append(renderExerciseCard(day, save));
 
   function selectTab(i, scroll) {
     dayTab.index = i;
@@ -278,6 +284,29 @@ async function renderMealCard(day, type, save) {
     memo);
 }
 
+function renderExerciseCard(day, save) {
+  const total = exerciseTotal(day);
+  const items = h('ul', { class: 'items' },
+    day.exercises.map((ex, idx) => h('li', {},
+      h('button', { class: 'item-main', onclick: () => openExerciseSheet(ex, async (next) => {
+        if (next) day.exercises[idx] = next; else day.exercises.splice(idx, 1);
+        await save();
+      }) },
+      h('span', { class: 'item-name' }, ex.name || '運動', ex.minutes ? h('small', { class: 'item-sub' }, ` ${ex.minutes}分`) : null),
+      h('span', { class: 'item-kcal' }, `-${fmt(ex.kcal)} kcal`)))));
+
+  return h('section', { class: 'card meal meal-exercise', role: 'tabpanel' },
+    h('header', { class: 'meal-head' },
+      h('h2', {}, h('span', { class: 'meal-icon' }, '🏃'), '運動'),
+      h('span', { class: 'meal-kcal' }, total ? `-${fmt(total)} kcal` : '')),
+    h('div', { class: 'items-wrap' }, items,
+      day.exercises.length ? null : h('p', { class: 'empty' }, 'まだ記録がありません')),
+    h('button', { class: 'add-btn', onclick: () => openExerciseSheet(null, async (next) => {
+      if (next) { day.exercises.push(next); await save(); }
+    }) }, '＋ 運動を追加'),
+    h('p', { class: 'hint' }, 'Apple Watch等の値はアクティブカロリーをそのまま入力できます'));
+}
+
 // ---------- bottom sheet: add / edit item ----------
 function openSheet(content) {
   const backdrop = h('div', { class: 'sheet-backdrop' });
@@ -332,6 +361,65 @@ function openItemSheet(type, item, onDone) {
   if (!item) setTimeout(() => name.focus(), 50);
 }
 
+function openExerciseSheet(ex, onDone) {
+  const profile = getProfile();
+  const weight = Number(profile?.weight) || 0;
+  let mets = ex?.mets || 0;
+  const name = h('input', { type: 'text', placeholder: '例: ジョギング', autocomplete: 'off' });
+  const minutes = h('input', { type: 'number', inputmode: 'numeric', placeholder: '30', min: 0, max: 1440 });
+  const kcal = h('input', { type: 'number', inputmode: 'numeric', placeholder: '0', min: 0, max: 9999 });
+  if (ex) { name.value = ex.name; minutes.value = ex.minutes || ''; kcal.value = ex.kcal; }
+
+  const recalc = () => {
+    const k = exerciseKcal(mets, Number(minutes.value), weight);
+    if (k) kcal.value = k;
+  };
+  minutes.addEventListener('input', recalc);
+  // Typing kcal by hand (e.g. from Apple Watch) stops auto-calculation.
+  kcal.addEventListener('input', () => { mets = 0; });
+
+  let close;
+  const submit = async (e) => {
+    e.preventDefault();
+    const k = Math.max(0, Math.round(Number(kcal.value) || 0));
+    const m = Math.max(0, Math.round(Number(minutes.value) || 0));
+    if (!name.value.trim() && !k) { name.focus(); return; }
+    close();
+    await onDone({ name: name.value.trim() || '運動', minutes: m, kcal: k, mets: mets || undefined });
+  };
+
+  const presets = h('div', { class: 'presets' },
+    EXERCISE_PRESETS.map((p) => h('button', {
+      type: 'button', class: 'chip',
+      onclick: () => {
+        name.value = p.name; mets = p.mets;
+        if (!minutes.value) minutes.value = 30;
+        recalc();
+      },
+    }, p.name)));
+
+  const form = h('form', { class: 'item-form', onsubmit: submit },
+    h('h3', {}, `🏃 運動：${ex ? '編集' : '追加'}`),
+    h('label', {}, '種目', name),
+    h('div', { class: 'row2' },
+      h('label', {}, '時間 (分)', minutes),
+      h('label', {}, '消費 (kcal)', kcal)),
+    h('p', { class: 'hint' }, weight
+      ? '種目を選ぶと時間と体重から消費kcalを自動計算します'
+      : '設定で体重を入力すると消費kcalを自動計算できます'),
+    presets,
+    h('div', { class: 'sheet-actions' },
+      ex ? h('button', { type: 'button', class: 'danger', onclick: async () => {
+        if (!confirm('この運動を削除しますか？')) return;
+        close(); await onDone(null);
+      } }, '削除') : null,
+      h('button', { type: 'button', class: 'secondary', onclick: () => close() }, 'キャンセル'),
+      h('button', { type: 'submit', class: 'primary' }, '保存')));
+
+  close = openSheet(form);
+  if (!ex) setTimeout(() => name.focus(), 50);
+}
+
 // ---------- photo viewer ----------
 function openPhotoViewer(photo, onDelete) {
   const url = URL.createObjectURL(photo.blob);
@@ -362,7 +450,7 @@ async function exportData() {
   const days = await getAllDays();
   const photos = await getAllPhotos();
   const data = {
-    app: 'gohan-tabeta', version: 1, exportedAt: new Date().toISOString(), goalKcal: getGoal(), days,
+    app: 'gohan-tabeta', version: 1, exportedAt: new Date().toISOString(), goalKcal: getGoal(), profile: getProfile(), days,
     photos: await Promise.all(photos.map(async (p) => ({ id: p.id, date: p.date, data: await blobToDataUrl(p.blob) }))),
   };
   const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
@@ -382,12 +470,94 @@ async function importData(file) {
   }
   for (const d of data.days) await putDay(d);
   if (data.goalKcal) setGoal(data.goalKcal);
+  if (data.profile) setProfile(data.profile);
   return true;
 }
 
+let settingsTab = 'profile';
+
 function renderSettings() {
   $title.textContent = '設定';
+  const tabs = [['profile', '基本情報'], ['goal', '目標'], ['data', 'データ']];
+  const seg = h('div', { class: 'segment', role: 'tablist' },
+    tabs.map(([id, label]) => h('button', {
+      role: 'tab', 'aria-selected': String(settingsTab === id),
+      onclick: () => { settingsTab = id; render(); },
+    }, label)));
+  const body = settingsTab === 'profile' ? renderProfileForm()
+    : settingsTab === 'goal' ? renderGoalForm() : renderDataPanel();
+  return h('div', { class: 'view settings-view' }, seg, body);
+}
+
+function renderProfileForm() {
+  const p = getProfile() || { sex: '', age: '', height: '', weight: '', activity: 1.2 };
+  const sex = h('select', { 'aria-label': '性別' },
+    h('option', { value: '' }, '選択'), h('option', { value: 'female' }, '女性'), h('option', { value: 'male' }, '男性'));
+  sex.value = p.sex || '';
+  const num = (value, attrs) => h('input', { type: 'number', inputmode: 'decimal', value: value || '', ...attrs });
+  const age = num(p.age, { min: 10, max: 100 });
+  const height = num(p.height, { min: 100, max: 250, step: 0.1 });
+  const weight = num(p.weight, { min: 20, max: 300, step: 0.1 });
+  const activity = h('select', { 'aria-label': '活動レベル' },
+    ACTIVITY_LEVELS.map((a) => h('option', { value: a.value }, a.label)));
+  activity.value = String(p.activity || 1.2);
+
+  const result = h('div', { class: 'energy' });
+  const readForm = () => ({
+    sex: sex.value, age: Number(age.value), height: Number(height.value),
+    weight: Number(weight.value), activity: Number(activity.value),
+  });
+  const update = () => {
+    const f = readForm();
+    if (!isProfileComplete(f)) { result.replaceChildren(h('p', { class: 'hint' }, 'すべて入力すると基礎代謝と消費カロリーを計算します')); return; }
+    result.replaceChildren(
+      h('div', { class: 'energy-item' }, h('small', {}, '基礎代謝(推定)'), h('strong', {}, fmt(calcBmr(f))), h('small', {}, 'kcal/日')),
+      h('div', { class: 'energy-item' }, h('small', {}, '1日の消費(運動除く)'), h('strong', {}, fmt(calcTdee(f))), h('small', {}, 'kcal/日')));
+  };
+  for (const el of [sex, age, height, weight, activity]) el.addEventListener('input', update);
+  update();
+
+  return h('form', { class: 'card profile-form', onsubmit: (e) => {
+    e.preventDefault();
+    const f = readForm();
+    if (!isProfileComplete(f)) { toast('すべての項目を入力してください'); return; }
+    setProfile(f); toast('保存しました');
+  } },
+  h('div', { class: 'grid2' },
+    h('label', {}, '性別', sex),
+    h('label', {}, '年齢', age),
+    h('label', {}, '身長 (cm)', height),
+    h('label', {}, '体重 (kg)', weight)),
+  h('label', {}, '普段の活動量（運動は別に記録）', activity),
+  result,
+  h('button', { class: 'primary block', type: 'submit' }, '保存'));
+}
+
+function renderGoalForm() {
   const goal = h('input', { type: 'number', inputmode: 'numeric', min: 500, max: 9999, value: getGoal() });
+  const p = getProfile();
+  const tdee = isProfileComplete(p) ? calcTdee(p) : 0;
+  const suggestion = (deficit, label) => {
+    const v = Math.max(1200, tdee - deficit);
+    return h('button', { type: 'button', class: 'chip', onclick: () => { goal.value = v; } },
+      `${label} ${fmt(v)}`);
+  };
+  return h('section', { class: 'card' },
+    h('h2', {}, '1日の目標カロリー（摂取）'),
+    h('form', { class: 'row', onsubmit: (e) => {
+      e.preventDefault();
+      const v = Math.round(Number(goal.value));
+      if (v < 500 || v > 9999) { toast('500〜9999で入力してください'); return; }
+      setGoal(v); toast('保存しました');
+    } }, goal, h('span', {}, 'kcal'), h('button', { class: 'primary', type: 'submit' }, '保存')),
+    tdee
+      ? [h('p', { class: 'hint' }, `消費 ${fmt(tdee)}kcal/日 からの目安（タップで入力）`),
+        h('div', { class: 'presets' },
+          suggestion(0, '維持'), suggestion(250, '週-0.25kg'), suggestion(500, '週-0.5kg'), suggestion(750, '週-0.75kg'))]
+      : h('p', { class: 'hint' }, '基本情報を入力すると、減量ペース別の目安を表示します'));
+}
+
+function renderDataPanel() {
   const fileInput = h('input', {
     type: 'file', accept: 'application/json,.json', hidden: true,
     onchange: async (e) => {
@@ -401,19 +571,9 @@ function renderSettings() {
       e.target.value = '';
     },
   });
-
-  return h('div', { class: 'view settings-view' },
+  return h('div', {},
     h('section', { class: 'card' },
-      h('h2', {}, '1日の目標カロリー'),
-      h('form', { class: 'row', onsubmit: (e) => {
-        e.preventDefault();
-        const v = Math.round(Number(goal.value));
-        if (v < 500 || v > 9999) { toast('500〜9999で入力してください'); return; }
-        setGoal(v); toast('保存しました');
-      } }, goal, h('span', {}, 'kcal'), h('button', { class: 'primary', type: 'submit' }, '保存')),
-      h('p', { class: 'hint' }, '目安: 女性 1,400〜2,000 / 男性 2,000〜2,600')),
-    h('section', { class: 'card' },
-      h('h2', {}, 'データのバックアップ'),
+      h('h2', {}, 'バックアップ'),
       h('p', { class: 'hint' }, 'データはこの端末内のみに保存。機種変更に備えて定期的にエクスポートしてください。'),
       h('div', { class: 'row' },
         h('button', { class: 'secondary', onclick: exportData }, 'エクスポート'),

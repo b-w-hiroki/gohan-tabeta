@@ -42,7 +42,7 @@ export const MEAL_TYPES = [
 export function emptyDay(date) {
   const meals = {};
   for (const t of MEAL_TYPES) meals[t.id] = { items: [], photos: [], memo: '' };
-  return { date, meals };
+  return { date, meals, exercises: [] };
 }
 
 export async function getDay(date) {
@@ -52,6 +52,7 @@ export async function getDay(date) {
   for (const t of MEAL_TYPES) {
     if (!day.meals[t.id]) day.meals[t.id] = { items: [], photos: [], memo: '' };
   }
+  if (!Array.isArray(day.exercises)) day.exercises = [];
   return day;
 }
 
@@ -92,6 +93,10 @@ export function dayTotal(day) {
   let total = 0;
   for (const t of MEAL_TYPES) total += mealTotal(day.meals[t.id]);
   return total;
+}
+
+export function exerciseTotal(day) {
+  return (day.exercises || []).reduce((sum, ex) => sum + (Number(ex.kcal) || 0), 0);
 }
 
 export function mealTotal(meal) {

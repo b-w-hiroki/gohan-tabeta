@@ -25,3 +25,19 @@ export const FOOD_PRESETS = [
   { name: 'カフェラテ', kcal: 120 },
   { name: 'ビール(350ml)', kcal: 140 },
 ];
+
+// Exercise presets with METs values (approximate, from the Compendium of Physical Activities).
+export const EXERCISE_PRESETS = [
+  { name: 'ウォーキング', mets: 3.5 },
+  { name: '早歩き', mets: 4.3 },
+  { name: 'ジョギング', mets: 7.0 },
+  { name: 'ランニング', mets: 9.8 },
+  { name: 'サイクリング', mets: 6.8 },
+  { name: '水泳', mets: 8.0 },
+  { name: '筋トレ', mets: 5.0 },
+  { name: 'ヨガ', mets: 2.5 },
+  { name: 'ストレッチ', mets: 2.3 },
+  { name: '階段昇降', mets: 8.0 },
+  { name: 'テニス', mets: 7.3 },
+  { name: 'ダンス', mets: 5.0 },
+];

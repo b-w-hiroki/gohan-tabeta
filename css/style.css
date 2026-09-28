@@ -134,7 +134,7 @@ main {
 .day-total strong { font-size: 24px; color: var(--text); }
 .day-total small { margin-left: 8px; }
 
-.tabs { flex: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 8px; }
+.tabs { flex: none; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-bottom: 8px; }
 .tab {
   min-height: 48px; border-radius: 10px; padding: 4px 2px;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -146,6 +146,7 @@ main {
 .tab-lunch[aria-selected="true"] { border-color: var(--c-lunch); }
 .tab-dinner[aria-selected="true"] { border-color: var(--c-dinner); }
 .tab-snack[aria-selected="true"] { border-color: var(--c-snack); }
+.tab-exercise[aria-selected="true"] { border-color: var(--accent); }
 
 /* Horizontal swipe between meals. */
 .panels {
@@ -334,7 +335,7 @@ body:has(.bottom-nav:not([hidden])) main { padding-bottom: 8px; }
 .period.range { gap: 2px; }
 .dash-view .stats { flex: none; }
 .dash-view .stat strong { font-size: 18px; }
-.chart-card { flex: 1; min-height: 160px; display: flex; flex-direction: column; }
+.chart-card { flex: 1; min-height: 160px; display: flex; flex-direction: column; overflow: hidden; }
 .chart-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 8px; }
 .chart-head h2 { margin: 0; font-size: 15px; white-space: nowrap; }
 .chart-legend { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--muted); white-space: nowrap; }
@@ -370,9 +371,44 @@ body:has(.bottom-nav:not([hidden])) main { padding-bottom: 8px; }
   .dash-view .stat strong { font-size: 16px; line-height: 1.3; }
   .dash-view .stat small { font-size: 11px; line-height: 1.3; }
   .dash-view .stat small:nth-child(3) { display: none; }
-  .chart-box { min-height: 80px; }
+  .chart-box { min-height: 60px; }
   .chart-card { min-height: 0; }
   .meal-card h2 { margin-bottom: 2px; }
   .presets-row .chip { min-height: 36px; font-size: 13px; }
   .meal-bars { gap: 2px; }
+}
+
+/* ---------- exercise ---------- */
+.meal-exercise { border-left-color: var(--accent); }
+.meal-exercise .hint { flex: none; margin: 4px 0 0; font-size: 12px; }
+.item-sub { color: var(--muted); font-size: 13px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tab-label { white-space: nowrap; font-size: 12px; }
+
+/* ---------- settings: profile ---------- */
+.settings-view { gap: 10px; }
+.settings-view .segment { flex: none; }
+select {
+  width: 100%; padding: 10px 12px; border-radius: 10px; font-size: 16px; font: inherit;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text); appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; background-size: 5px 5px; background-repeat: no-repeat;
+}
+.profile-form label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.profile-form label input, .profile-form label select { margin-top: 2px; color: var(--text); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+.energy { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 10px; }
+.energy .hint { grid-column: 1 / -1; margin: 0; }
+.energy-item { background: var(--accent-weak); border-radius: 10px; padding: 6px; text-align: center; display: flex; flex-direction: column; }
+.energy-item small { font-size: 11px; color: var(--muted); }
+.energy-item strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.block { width: 100%; }
+
+/* ---------- dashboard: balance ---------- */
+.stat-link { text-decoration: none; color: inherit; }
+.balance-note { flex: none; margin: 0; font-size: 12px; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 6px 10px; }
+@media (max-height: 700px) {
+  .profile-form label { margin-bottom: 4px; }
+  .profile-form input, .profile-form select { padding: 7px 10px; }
+  .energy-item strong { font-size: 16px; }
 }

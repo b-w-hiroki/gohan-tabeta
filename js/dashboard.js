@@ -1,7 +1,8 @@
 // Dashboard: calorie trends for a week, a month, or the last N days.
-import { MEAL_TYPES, getDaysInRange, dayTotal, mealTotal } from './db.js';
+import { MEAL_TYPES, getDaysInRange, dayTotal, mealTotal, exerciseTotal } from './db.js';
 import {
   WEEKDAYS, toKey, fromKey, todayKey, addDays, daysBetween, fmt, shortDate, h, getGoal,
+  getProfile, isProfileComplete, calcTdee, KCAL_PER_KG,
 } from './util.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -100,6 +101,7 @@ function drawChart(box, bars, unit, goal, onSelect, selectedKey) {
   // Recessive grid: 0 and max. The goal gets its own labelled tick instead of a mid line.
   for (const v of [0, niceMax]) {
     root.append(svg('line', { x1: pad.l, x2: W - pad.r, y1: y(v), y2: y(v), class: v === 0 ? 'axis' : 'grid' }));
+    if (Math.abs(y(v) - y(goal)) < 12) continue; // the goal label takes priority
     const t = svg('text', { x: pad.l - 4, y: y(v) + 4, 'text-anchor': 'end', class: 'tick' });
     t.textContent = v >= 1000 ? `${v / 1000}k` : String(v);
     root.append(t);
@@ -151,6 +153,14 @@ export async function renderDashboard($title) {
   const avg = recorded ? Math.round(sum / recorded) : 0;
   const within = totals.filter((v) => v <= goal).length;
 
+  // Energy balance on days with food records: (TDEE + exercise) - intake.
+  const profile = getProfile();
+  const tdee = isProfileComplete(profile) ? calcTdee(profile) : 0;
+  const balance = days.filter((d) => dayTotal(d) > 0)
+    .reduce((a, d) => a + tdee + exerciseTotal(d) - dayTotal(d), 0);
+  const kg = balance / KCAL_PER_KG;
+  const kgText = `${kg > 0 ? '-' : kg < 0 ? '+' : '±'}${Math.abs(kg).toFixed(Math.abs(kg) >= 1 ? 1 : 2)}kg`;
+
   // Average kcal per meal over recorded days.
   const mealAvg = MEAL_TYPES.map((t) => {
     const s = days.filter((d) => dayTotal(d) > 0).reduce((a, d) => a + mealTotal(d.meals[t.id]), 0);
@@ -174,7 +184,7 @@ export async function renderDashboard($title) {
         RANGE_PRESETS.map((n) => h('button', {
           class: 'chip', 'aria-pressed': String(state.days === n),
           onclick: () => { state.days = n; rerender(); },
-        }, `直近${n}日`))),
+        }, `${n}日`))),
       h('small', { class: 'period-sub' }, `${label}（今日まで）`));
   } else {
     periodRow = h('div', { class: 'period' },
@@ -187,7 +197,19 @@ export async function renderDashboard($title) {
   const kpis = h('div', { class: 'stats' },
     kpi('1日平均', `${fmt(avg)}`, 'kcal'),
     kpi('目標内の日', `${within}/${recorded}`, recorded ? `${Math.round((within / recorded) * 100)}%` : '日'),
-    kpi('合計', `${fmt(sum)}`, 'kcal'));
+    tdee && recorded
+      ? h('a', { class: `stat stat-link${kg > 0 ? ' loss' : ''}`, href: '#/stats', onclick: (e) => { e.preventDefault(); toggleBalance(); } },
+        h('small', {}, '推定減量'), h('strong', {}, kgText), h('small', {}, `${balance > 0 ? '-' : '+'}${fmt(Math.abs(Math.round(balance)))}kcal`))
+      : tdee
+        ? h('div', { class: 'stat' }, h('small', {}, '推定減量'), h('strong', {}, '—'), h('small', {}, '記録なし'))
+        : h('a', { class: 'stat stat-link', href: '#/settings' },
+          h('small', {}, '推定減量'), h('strong', {}, '—'), h('small', {}, '基本情報を入力')));
+
+  // Tapping the estimate shows how it was calculated.
+  const exSum = days.filter((d) => dayTotal(d) > 0).reduce((a, d) => a + exerciseTotal(d), 0);
+  const balanceNote = h('p', { class: 'balance-note', hidden: true },
+    `記録${recorded}日: 消費 ${fmt(tdee * recorded)} + 運動 ${fmt(exSum)} − 摂取 ${fmt(sum)} = ${fmt(Math.round(balance))}kcal ÷ ${fmt(KCAL_PER_KG)}kcal/kg（食事未記録の日は除外）`);
+  function toggleBalance() { balanceNote.hidden = !balanceNote.hidden; }
 
   const { bars, unit } = buildBars(from, to, byDate);
   const chartBox = h('div', { class: 'chart-box' });
@@ -218,7 +240,7 @@ export async function renderDashboard($title) {
       h('span', { class: 'meal-bar-value' }, fmt(m.value)))));
 
   const view = h('div', { class: 'view dash-view' },
-    seg, periodRow, kpis,
+    seg, periodRow, kpis, balanceNote,
     h('section', { class: 'card chart-card' },
       h('div', { class: 'chart-head' },
         h('h2', {}, unit === 'week' ? '週平均カロリー' : '日別カロリー'),
@@ -229,7 +251,17 @@ export async function renderDashboard($title) {
     h('section', { class: 'card meal-card' },
       h('h2', {}, '食事別の平均 (kcal/日)'), meals));
 
-  const onResize = () => { if (chartBox.isConnected) draw(); else window.removeEventListener('resize', onResize); };
-  view.onMount = () => { draw(); window.addEventListener('resize', onResize); };
+  // Redraw whenever the chart area changes size (rotation, the balance note opening, etc.).
+  view.onMount = () => {
+    draw();
+    if (typeof ResizeObserver === 'undefined') return;
+    let last = '';
+    const ro = new ResizeObserver(() => {
+      if (!chartBox.isConnected) { ro.disconnect(); return; }
+      const size = `${chartBox.clientWidth}x${chartBox.clientHeight}`;
+      if (size !== last) { last = size; draw(); }
+    });
+    ro.observe(chartBox);
+  };
   return view;
 }
