@@ -85,6 +85,7 @@ const ICONS = {
   camera: '<path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/>',
   close: '<path d="M18 6L6 18M6 6l12 12"/>',
   trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
+  watch: '<rect x="6" y="6" width="12" height="12" rx="3"/><path d="M9 6l.7-3.5h4.6L15 6M9 18l.7 3.5h4.6L15 18M12 9.5V12l1.5 1.5"/>',
 };
 
 export function iconSvg(name, size = 24) {
@@ -96,4 +97,12 @@ export function icon(name, size) {
   span.className = 'icon';
   span.innerHTML = iconSvg(name, size);
   return span;
+}
+
+// Pull a calorie number out of pasted text such as "347", "347.6 kcal" or "1,234 kcal".
+export function parseKcal(text) {
+  const m = String(text ?? '').replace(/,/g, '').match(/\d+(?:\.\d+)?/);
+  if (!m) return 0;
+  const v = Math.round(Number(m[0]));
+  return v > 0 && v < 10000 ? v : 0;
 }
