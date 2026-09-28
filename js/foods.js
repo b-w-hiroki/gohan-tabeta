@@ -1,0 +1,43 @@
+// Rough calorie presets (kcal per typical serving) for quick entry.
+export const FOOD_PRESETS = [
+  { name: 'ごはん(茶碗1杯)', kcal: 234 },
+  { name: 'ごはん(大盛り)', kcal: 351 },
+  { name: '食パン(6枚切1枚)', kcal: 149 },
+  { name: 'おにぎり(鮭)', kcal: 180 },
+  { name: 'みそ汁', kcal: 40 },
+  { name: '卵焼き', kcal: 90 },
+  { name: 'ゆで卵', kcal: 76 },
+  { name: '納豆(1パック)', kcal: 90 },
+  { name: 'ヨーグルト', kcal: 60 },
+  { name: 'バナナ', kcal: 86 },
+  { name: 'サラダ', kcal: 30 },
+  { name: '焼き魚(鮭)', kcal: 130 },
+  { name: '唐揚げ(3個)', kcal: 250 },
+  { name: '生姜焼き', kcal: 330 },
+  { name: 'カレーライス', kcal: 750 },
+  { name: 'ラーメン', kcal: 500 },
+  { name: 'うどん(かけ)', kcal: 320 },
+  { name: 'そば(ざる)', kcal: 300 },
+  { name: 'パスタ(ミート)', kcal: 650 },
+  { name: '牛丼(並)', kcal: 650 },
+  { name: 'サンドイッチ', kcal: 300 },
+  { name: 'コーヒー(ブラック)', kcal: 5 },
+  { name: 'カフェラテ', kcal: 120 },
+  { name: 'ビール(350ml)', kcal: 140 },
+];
+
+// Exercise presets with METs values (approximate, from the Compendium of Physical Activities).
+export const EXERCISE_PRESETS = [
+  { name: 'ウォーキング', mets: 3.5 },
+  { name: '早歩き', mets: 4.3 },
+  { name: 'ジョギング', mets: 7.0 },
+  { name: 'ランニング', mets: 9.8 },
+  { name: 'サイクリング', mets: 6.8 },
+  { name: '水泳', mets: 8.0 },
+  { name: '筋トレ', mets: 5.0 },
+  { name: 'ヨガ', mets: 2.5 },
+  { name: 'ストレッチ', mets: 2.3 },
+  { name: '階段昇降', mets: 8.0 },
+  { name: 'テニス', mets: 7.3 },
+  { name: 'ダンス', mets: 5.0 },
+];
