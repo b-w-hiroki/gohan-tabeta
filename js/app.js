@@ -6,7 +6,7 @@ import { FOOD_PRESETS, EXERCISE_PRESETS } from './foods.js';
 import {
   WEEKDAYS, pad, toKey, fromKey, todayKey, addDays, uid, fmt, h, getGoal, setGoal,
   getProfile, setProfile, isProfileComplete, calcBmr, calcTdee, exerciseKcal, ACTIVITY_LEVELS,
-  icon, iconSvg,
+  icon, iconSvg, parseKcal, getShortcutName, setShortcutName, DEFAULT_SHORTCUT,
 } from './util.js';
 import { renderDashboard } from './dashboard.js';
 
@@ -23,6 +23,7 @@ function blobUrl(blob) { const u = URL.createObjectURL(blob); objectUrls.push(u)
 function revokeUrls() { objectUrls.forEach((u) => URL.revokeObjectURL(u)); objectUrls = []; }
 
 function toast(msg) {
+  document.querySelectorAll('.toast').forEach((t) => t.remove());
   const el = h('div', { class: 'toast' }, msg);
   document.body.append(el);
   setTimeout(() => el.remove(), 2200);
@@ -71,8 +72,13 @@ for (const el of document.querySelectorAll('[data-icon]')) el.innerHTML = iconSv
 
 // ---------- router ----------
 function parseRoute() {
-  const hash = location.hash.replace(/^#\/?/, '');
-  const [name, arg] = hash.split('/');
+  const [path, query = ''] = location.hash.replace(/^#\/?/, '').split('?');
+  const [name, arg] = path.split('/');
+  if (name === 'import') {
+    const q = new URLSearchParams(query);
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(q.get('date') || '') ? q.get('date') : todayKey();
+    return { name: 'import', date, kcal: parseKcal(q.get('kcal')) };
+  }
   if (name === 'today') return { name: 'day', date: todayKey() };
   if (name === 'day' && /^\d{4}-\d{2}-\d{2}$/.test(arg || '')) return { name: 'day', date: arg };
   if (name === 'settings') return { name: 'settings' };
@@ -84,6 +90,18 @@ function parseRoute() {
 async function render() {
   revokeUrls();
   const route = parseRoute();
+  if (route.name === 'import') {
+    // Opened from an iOS Shortcut: save, then show that day's exercise tab.
+    if (route.kcal && confirm(`アクティブカロリー ${fmt(route.kcal)}kcal を${route.date === todayKey() ? '今日' : route.date}の運動に記録しますか？`)) {
+      await saveWatchKcal(route.date, route.kcal);
+      toast('Apple Watchの値を記録しました');
+    } else if (!route.kcal) {
+      toast('取り込む値が見つかりませんでした');
+    }
+    dayTab = { date: route.date, index: MEAL_TYPES.length };
+    location.replace(route.date === todayKey() ? '#/today' : `#/day/${route.date}`);
+    return;
+  }
   const active = route.name === 'day' ? (route.date === todayKey() ? 'today' : 'calendar')
     : route.name === 'month' ? 'calendar' : route.name;
   for (const a of $nav.querySelectorAll('a')) {
@@ -98,6 +116,10 @@ async function render() {
   view.onMount?.();
 }
 window.addEventListener('hashchange', render);
+// Coming back from the Shortcuts app: redraw so the paste prompt appears.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && getWatchPending()) render();
+});
 
 // ---------- month (calendar) view ----------
 async function renderMonth(month) {
@@ -190,6 +212,7 @@ async function renderDay(date) {
   const pct = Math.min(100, Math.round((total / goal) * 100));
   const remain = goal - total;
   if (dayTab.date !== date) dayTab = { date, index: defaultMealIndex(date) };
+  if (getWatchPending() === date) dayTab.index = MEAL_TYPES.length;
 
   const save = async () => { await putDay(day); await render(); };
 
@@ -329,17 +352,76 @@ function renderExerciseCard(day, save) {
       h('span', { class: 'item-kcal' }, `-${fmt(ex.kcal)} kcal`),
       icon('chevron-right', 16)))));
 
+  const pending = getWatchPending() === day.date;
+  const paste = async () => { if (await pasteWatchKcal(day.date)) render(); };
+
   return h('section', { class: 'card meal meal-exercise', role: 'tabpanel', 'aria-label': '運動' },
     h('header', { class: 'meal-head' },
       h('h2', {}, '運動'),
       h('span', { class: 'meal-kcal' }, total ? `-${fmt(total)} kcal` : '')),
     h('div', { class: 'items-wrap' }, items,
       day.exercises.length ? null : h('p', { class: 'empty' }, '運動はまだ記録がありません')),
-    h('div', { class: 'actions' },
-      actionButton('plus', '運動を追加', { class: 'action-btn primary-soft', onclick: () => openExerciseSheet(null, async (next) => {
-        if (next) { day.exercises.push(next); await save(); }
-      }) })),
-    h('p', { class: 'hint' }, 'Apple Watchの値は「アクティブカロリー」を入力'));
+    pending
+      ? h('div', { class: 'watch-banner', role: 'status' },
+        h('p', {}, icon('watch', 18), 'ショートカットでコピーした値を記録します'),
+        h('div', { class: 'actions' },
+          h('button', { class: 'primary watch-paste', onclick: paste }, '貼り付けて記録'),
+          h('button', { class: 'action-btn', onclick: () => { clearWatchPending(); render(); } }, 'やめる')),
+        h('small', {}, '「ペースト」と表示されたらタップ'))
+      : h('div', { class: 'actions' },
+        actionButton('plus', '運動を追加', { class: 'action-btn primary-soft', onclick: () => openExerciseSheet(null, async (next) => {
+          if (next) { day.exercises.push(next); await save(); }
+        }) }),
+        actionButton('watch', 'Watch', { 'aria-label': 'ショートカットでApple Watchの値を取り込む', onclick: () => runWatchShortcut(day.date) })),
+    pending ? null : h('p', { class: 'hint' }, 'Watch：ショートカット実行後に戻って貼り付け　',
+      h('button', { class: 'text-btn', onclick: paste }, 'コピー済みの値を貼る')));
+}
+
+// ---------- Apple Watch (via iOS Shortcuts) ----------
+// The app launches the Shortcut, the Shortcut copies the value, and on return the app offers a paste button.
+const PENDING_KEY = 'watchPending';
+const PENDING_TTL = 15 * 60 * 1000;
+
+function getWatchPending() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PENDING_KEY));
+    return p && Date.now() - p.at < PENDING_TTL ? p.date : null;
+  } catch { return null; }
+}
+function clearWatchPending() {
+  try { localStorage.removeItem(PENDING_KEY); } catch { /* storage unavailable */ }
+}
+function runWatchShortcut(date) {
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify({ date, at: Date.now() })); } catch { /* storage unavailable */ }
+  location.href = `shortcuts://run-shortcut?name=${encodeURIComponent(getShortcutName())}`;
+  // If the Shortcuts app did not open (e.g. not on iOS), still show the paste prompt.
+  setTimeout(() => { if (document.visibilityState === 'visible') render(); }, 1500);
+}
+
+// One Watch entry per day: re-importing later in the day replaces it instead of double counting.
+async function saveWatchKcal(date, kcal) {
+  const day = await getDay(date);
+  day.exercises = day.exercises.filter((ex) => ex.source !== 'watch');
+  day.exercises.push({ name: 'Apple Watch', minutes: 0, kcal, source: 'watch' });
+  await putDay(day);
+}
+
+async function pasteWatchKcal(date) {
+  let text = '';
+  try {
+    text = await navigator.clipboard.readText();
+  } catch { /* clipboard blocked: fall back to manual paste */ }
+  let kcal = parseKcal(text);
+  if (!kcal) {
+    const typed = prompt('アクティブカロリーを貼り付けてください（例: 347）', text || '');
+    if (typed == null) return false;
+    kcal = parseKcal(typed);
+  }
+  if (!kcal) { toast('数値が見つかりませんでした'); return false; }
+  await saveWatchKcal(date, kcal);
+  clearWatchPending();
+  toast(`Apple Watch ${fmt(kcal)}kcal を記録しました`);
+  return true;
 }
 
 // ---------- bottom sheet: add / edit item ----------
@@ -513,14 +595,15 @@ let settingsTab = 'profile';
 
 function renderSettings() {
   setHeader({ title: '設定' });
-  const tabs = [['profile', '基本情報'], ['goal', '目標'], ['data', 'データ']];
+  const tabs = [['profile', '基本情報'], ['goal', '目標'], ['link', '連携'], ['data', 'データ']];
   const seg = h('div', { class: 'segment', role: 'tablist' },
     tabs.map(([id, label]) => h('button', {
       role: 'tab', 'aria-selected': String(settingsTab === id),
       onclick: () => { settingsTab = id; render(); },
     }, label)));
   const body = settingsTab === 'profile' ? renderProfileForm()
-    : settingsTab === 'goal' ? renderGoalForm() : renderDataPanel();
+    : settingsTab === 'goal' ? renderGoalForm()
+      : settingsTab === 'link' ? renderLinkPanel() : renderDataPanel();
   return h('div', { class: 'view settings-view' }, seg, body);
 }
 
@@ -590,6 +673,25 @@ function renderGoalForm() {
         h('div', { class: 'presets' },
           suggestion(0, '維持'), suggestion(250, '週-0.25kg'), suggestion(500, '週-0.5kg'), suggestion(750, '週-0.75kg'))]
       : h('p', { class: 'hint' }, '基本情報を入力すると、減量ペース別の目安を表示します'));
+}
+
+function renderLinkPanel() {
+  const name = h('input', { type: 'text', value: getShortcutName(), 'aria-label': 'ショートカット名', autocomplete: 'off' });
+  const step = (n, ...body) => h('li', {}, h('span', { class: 'step-no' }, n), h('span', {}, ...body));
+  const b = (t) => h('b', {}, t);
+  return h('section', { class: 'card link-panel' },
+    h('h2', {}, 'Apple Watchの消費カロリー取り込み'),
+    h('p', { class: 'hint' }, 'ショートカットAppで次の手順のショートカットを1回だけ作成します'),
+    h('ol', { class: 'steps' },
+      step(1, '新規作成し、名前を ', b(`「${getShortcutName()}」`), ' にする'),
+      step(2, b('ヘルスケアサンプルを検索'), '（アクティブエネルギー・開始日が今日）'),
+      step(3, b('統計を計算'), '（合計）→ ', b('数値を丸める')),
+      step(4, b('クリップボードにコピー'), ' を追加して保存')),
+    h('form', { class: 'row', onsubmit: (e) => {
+      e.preventDefault();
+      setShortcutName(name.value.trim() || DEFAULT_SHORTCUT); toast('保存しました'); render();
+    } }, name, h('button', { class: 'secondary', type: 'submit' }, '名前を保存')),
+    h('p', { class: 'hint note' }, '使い方：運動タブの「Watch」→ 実行後にこのアプリへ戻り「貼り付けて記録」。同じ日は上書き'));
 }
 
 function renderDataPanel() {
