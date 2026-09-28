@@ -32,6 +32,26 @@ export function getGoal() {
 }
 export function setGoal(v) {
   try { localStorage.setItem('goalKcal', String(v)); } catch { /* storage unavailable */ }
+  settingsHook?.({ goalKcal: Number(v) });
+}
+
+// Settings are cached in localStorage for synchronous reads; when logged in the hook mirrors them to the cloud.
+let settingsHook = null;
+export function setSettingsHook(fn) { settingsHook = fn; }
+export function applySettings(s) {
+  if (!s) return;
+  try {
+    if (s.goalKcal) localStorage.setItem('goalKcal', String(s.goalKcal));
+    if (s.profile) localStorage.setItem('profile', JSON.stringify(s.profile));
+    if (s.shortcutName) localStorage.setItem('shortcutName', s.shortcutName);
+  } catch { /* storage unavailable */ }
+}
+export function currentSettings() {
+  const out = { goalKcal: getGoal() };
+  const p = getProfile();
+  if (p) out.profile = p;
+  try { const n = localStorage.getItem('shortcutName'); if (n) out.shortcutName = n; } catch { /* ignore */ }
+  return out;
 }
 
 // ---------- profile & energy estimates ----------
@@ -49,6 +69,7 @@ export function getProfile() {
 }
 export function setProfile(p) {
   try { localStorage.setItem('profile', JSON.stringify(p)); } catch { /* storage unavailable */ }
+  settingsHook?.({ profile: p });
 }
 
 export function isProfileComplete(p) {
@@ -114,4 +135,5 @@ export function getShortcutName() {
 }
 export function setShortcutName(v) {
   try { localStorage.setItem('shortcutName', v); } catch { /* storage unavailable */ }
+  settingsHook?.({ shortcutName: v });
 }

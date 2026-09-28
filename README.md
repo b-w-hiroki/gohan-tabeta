@@ -22,7 +22,29 @@
 - 目標カロリー設定、JSONエクスポート/インポート（写真込み）
 - ホーム画面に追加でアプリのように全画面表示、オフライン動作
 
-## 使い方
+## ページ構成
+- `index.html` … 紹介ページ（トップ）。ホーム画面から起動した場合や `#/…` 付きURLは `app.html` へ転送
+- `app.html` … アプリ本体。未ログインならログイン画面（Google／メール／ログインせずに使う）
+- `privacy.html` … プライバシーポリシー
+
+## ログインとクラウド保存（Firebase）
+- ログイン時：記録・写真・設定を Cloud Firestore（`users/{uid}/days`・`users/{uid}/photos`・`users/{uid}`）に保存。オフラインでも記録でき、つながると同期
+- ログインしない場合：従来どおり端末内（IndexedDB）に保存
+- 端末に記録がある状態で初めてログインすると、アカウントへ移すか確認する
+- 写真は Firestore の1ドキュメント（1MiB上限）に収まるよう縮小して保存（Cloud Storage は使わないため無料枠で運用可）
+- 設定 → データ から、ログアウト／アカウントとデータの削除ができる
+
+### Firebase の準備（初回のみ）
+1. Firebase Console でプロジェクトを作成（Googleアナリティクスは不要）
+2. Authentication → ログイン方法で「Google」と「メール/パスワード」を有効化
+3. Authentication → 設定 → 承認済みドメインに `gohan-tabeta.birdman-studio.com` を追加
+4. Firestore Database を作成（本番モード、ロケーションは `asia-northeast1` 推奨）し、ルールに `firestore.rules` の内容を貼り付けて公開
+5. プロジェクトの設定 → マイアプリ → ウェブアプリを追加し、表示された `firebaseConfig` を `js/firebase-config.js` の `FIREBASE_CONFIG` に貼る
+   （値は公開前提のもの。アクセス制御は Firestore ルールで行う）
+
+`FIREBASE_CONFIG` が `null` の間は、ログイン画面に「準備中」と表示され、ログインせずに使うことだけができる。
+
+## 使い方（開発）
 ビルド不要の静的サイト。任意の静的サーバで配信するだけ。
 
 ```sh
@@ -33,14 +55,14 @@ npx http-server -p 8080 .
 - URL: https://gohan-tabeta.birdman-studio.com/
 - GitHub Pages（Settings → Pages → Deploy from a branch → `main` / root）。カスタムドメインはルートの `CNAME` で指定
 - DNS（birdman-studio.com）: `gohan-tabeta` の CNAME → `b-w-hiroki.github.io`
-- 記録データはドメインごとに保存されるため、URLを変更すると記録は引き継がれない（エクスポート／インポートで移行）
+- ログインせずに使う場合、記録データはドメインごとに端末内へ保存されるため、URLを変更すると引き継がれない（エクスポート／インポートで移行）
 
 ## データ保存について
-- データは**端末のブラウザ内（IndexedDB）にのみ**保存される。サーバ送信なし
-- 端末間同期はない。機種変更・ブラウザのデータ削除で消えるため、設定画面から定期的にエクスポートすること
-- iOS Safari はホーム画面に追加しないと長期間未使用時にデータが消える可能性がある
+- ログインしない場合：データは**端末のブラウザ内（IndexedDB）にのみ**保存。機種変更・ブラウザのデータ削除で消えるため、定期的にエクスポートすること。iOS Safari はホーム画面に追加しないと長期間未使用時に消える可能性がある
+- ログインした場合：Firestore に保存され、端末間で同期される（上記「ログインとクラウド保存」参照）
 
 ## 構成
 - `index.html` / `css/style.css`
-- `js/app.js` 画面（ハッシュルーティング）、`js/dashboard.js` ダッシュボード、`js/db.js` IndexedDB、`js/util.js` 共通処理、`js/foods.js` プリセット
+- `js/app.js` 画面（ハッシュルーティング）・ログイン画面、`js/dashboard.js` ダッシュボード、`js/db.js` データ層（端末／クラウド切替）、`js/cloud.js` Firebase（Auth・Firestore）、`js/firebase-config.js` Firebase設定、`js/util.js` 共通処理、`js/foods.js` プリセット
+- `images/` 紹介ページ用のスクリーンショット、`firestore.rules` Firestore セキュリティルール
 - `sw.js` オフラインキャッシュ、`manifest.webmanifest` PWA設定

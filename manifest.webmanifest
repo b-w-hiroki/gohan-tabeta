@@ -3,7 +3,7 @@
   "short_name": "ごはん食べた",
   "description": "日毎のカレンダーで朝昼晩の食事とカロリー、写真を記録するシンプルな食事管理ツール",
   "lang": "ja",
-  "start_url": "./",
+  "start_url": "./app.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",

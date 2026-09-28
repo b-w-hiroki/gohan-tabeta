@@ -1,4 +1,5 @@
-// IndexedDB wrapper. Day records are keyed by "YYYY-MM-DD"; photos are stored as Blobs.
+// Data layer. Day records are keyed by "YYYY-MM-DD"; photos are stored as Blobs.
+// Records live in IndexedDB (local) or Firestore (after login); callers use the exports below.
 const DB_NAME = 'gohan-tabeta';
 const DB_VERSION = 1;
 
@@ -45,8 +46,28 @@ export function emptyDay(date) {
   return { date, meals, exercises: [] };
 }
 
+// ---------- local store (IndexedDB) ----------
+export const localStore = {
+  getDay: (date) => run('days', 'readonly', (s) => s.get(date)),
+  putDay: (day) => run('days', 'readwrite', (s) => s.put(day)),
+  getDaysInRange: (from, to) => run('days', 'readonly', (s) => s.getAll(IDBKeyRange.bound(from, to))),
+  getAllDays: () => run('days', 'readonly', (s) => s.getAll()),
+  putPhoto: (photo) => run('photos', 'readwrite', (s) => s.put(photo)),
+  getPhoto: (id) => run('photos', 'readonly', (s) => s.get(id)),
+  deletePhoto: (id) => run('photos', 'readwrite', (s) => s.delete(id)),
+  getAllPhotos: () => run('photos', 'readonly', (s) => s.getAll()),
+  async clearAll() {
+    await run('days', 'readwrite', (s) => s.clear());
+    await run('photos', 'readwrite', (s) => s.clear());
+  },
+};
+
+// ---------- active store: local by default, cloud after login ----------
+let store = localStore;
+export function useStore(next) { store = next; }
+
 export async function getDay(date) {
-  const day = await run('days', 'readonly', (s) => s.get(date));
+  const day = await store.getDay(date);
   if (!day) return emptyDay(date);
   // Fill in meal types added after the record was created.
   for (const t of MEAL_TYPES) {
@@ -56,38 +77,14 @@ export async function getDay(date) {
   return day;
 }
 
-export function putDay(day) {
-  return run('days', 'readwrite', (s) => s.put(day));
-}
-
-export function getDaysInRange(from, to) {
-  return run('days', 'readonly', (s) => s.getAll(IDBKeyRange.bound(from, to)));
-}
-
-export function getAllDays() {
-  return run('days', 'readonly', (s) => s.getAll());
-}
-
-export function putPhoto(photo) {
-  return run('photos', 'readwrite', (s) => s.put(photo));
-}
-
-export function getPhoto(id) {
-  return run('photos', 'readonly', (s) => s.get(id));
-}
-
-export function deletePhoto(id) {
-  return run('photos', 'readwrite', (s) => s.delete(id));
-}
-
-export function getAllPhotos() {
-  return run('photos', 'readonly', (s) => s.getAll());
-}
-
-export async function clearAll() {
-  await run('days', 'readwrite', (s) => s.clear());
-  await run('photos', 'readwrite', (s) => s.clear());
-}
+export const putDay = (day) => store.putDay(day);
+export const getDaysInRange = (from, to) => store.getDaysInRange(from, to);
+export const getAllDays = () => store.getAllDays();
+export const putPhoto = (photo) => store.putPhoto(photo);
+export const getPhoto = (id) => store.getPhoto(id);
+export const deletePhoto = (id) => store.deletePhoto(id);
+export const getAllPhotos = () => store.getAllPhotos();
+export const clearAll = () => store.clearAll();
 
 export function dayTotal(day) {
   let total = 0;
