@@ -2,7 +2,7 @@
 import { MEAL_TYPES, getDaysInRange, dayTotal, mealTotal, exerciseTotal } from './db.js';
 import {
   WEEKDAYS, toKey, fromKey, todayKey, addDays, daysBetween, fmt, shortDate, h, getGoal,
-  getProfile, isProfileComplete, calcTdee, KCAL_PER_KG,
+  getProfile, isProfileComplete, calcTdee, KCAL_PER_KG, icon,
 } from './util.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -141,8 +141,8 @@ function drawChart(box, bars, unit, goal, onSelect, selectedKey) {
   box.append(root);
 }
 
-export async function renderDashboard($title) {
-  $title.textContent = 'ダッシュボード';
+export async function renderDashboard(setHeader) {
+  setHeader({ title: 'ダッシュボード' });
   const goal = getGoal();
   const { from, to, label } = currentRange();
   const days = await getDaysInRange(from, to);
@@ -188,9 +188,9 @@ export async function renderDashboard($title) {
       h('small', { class: 'period-sub' }, `${label}（今日まで）`));
   } else {
     periodRow = h('div', { class: 'period' },
-      h('button', { class: 'icon-btn', 'aria-label': '前へ', onclick: () => { shift(-1); rerender(); } }, '‹'),
+      h('button', { class: 'icon-btn', 'aria-label': '前へ', onclick: () => { shift(-1); rerender(); } }, icon('chevron-left')),
       h('strong', { class: 'period-label' }, label),
-      h('button', { class: 'icon-btn', 'aria-label': '次へ', onclick: () => { shift(1); rerender(); } }, '›'));
+      h('button', { class: 'icon-btn', 'aria-label': '次へ', onclick: () => { shift(1); rerender(); } }, icon('chevron-right')));
   }
 
   const kpi = (title, value, sub) => h('div', { class: 'stat' }, h('small', {}, title), h('strong', {}, value), sub ? h('small', {}, sub) : null);
@@ -235,9 +235,9 @@ export async function renderDashboard($title) {
   const meals = h('div', { class: 'meal-bars' },
     mealAvg.map((m) => h('div', { class: 'meal-bar-row' },
       h('span', { class: 'meal-bar-label' }, m.label),
+      h('span', { class: 'meal-bar-value' }, fmt(m.value)),
       h('span', { class: 'meal-bar-track' },
-        h('span', { class: `meal-bar-fill dot-${m.id}`, style: `width:${(m.value / mealMax) * 100}%` })),
-      h('span', { class: 'meal-bar-value' }, fmt(m.value)))));
+        h('span', { class: `meal-bar-fill dot-${m.id}`, style: `width:${(m.value / mealMax) * 100}%` })))));
 
   const view = h('div', { class: 'view dash-view' },
     seg, periodRow, kpis, balanceNote,

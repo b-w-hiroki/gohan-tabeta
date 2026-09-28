@@ -6,12 +6,15 @@ import { FOOD_PRESETS, EXERCISE_PRESETS } from './foods.js';
 import {
   WEEKDAYS, pad, toKey, fromKey, todayKey, addDays, uid, fmt, h, getGoal, setGoal,
   getProfile, setProfile, isProfileComplete, calcBmr, calcTdee, exerciseKcal, ACTIVITY_LEVELS,
+  icon, iconSvg,
 } from './util.js';
 import { renderDashboard } from './dashboard.js';
 
 const $app = document.getElementById('app');
 const $title = document.getElementById('title');
-const $back = document.getElementById('back');
+const $subtitle = document.getElementById('subtitle');
+const $left = document.getElementById('hd-left');
+const $right = document.getElementById('hd-right');
 const $nav = document.getElementById('bottom-nav');
 
 // Object URLs created for the current view; revoked on every navigation.
@@ -47,10 +50,30 @@ async function compressImage(file, maxSize = 1280, quality = 0.8) {
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b || file), 'image/jpeg', quality));
 }
 
+// ---------- header ----------
+// Each view configures the top bar: a title, optional subtitle and optional prev/next arrows.
+function setHeader({ title, subtitle = '', prev = null, next = null, onTitle = null }) {
+  $title.textContent = title;
+  $subtitle.textContent = subtitle;
+  $subtitle.hidden = !subtitle;
+  const wrap = $title.parentElement;
+  wrap.onclick = onTitle;
+  wrap.classList.toggle('tappable', !!onTitle);
+  for (const [btn, cfg, name] of [[$left, prev, 'chevron-left'], [$right, next, 'chevron-right']]) {
+    btn.hidden = !cfg;
+    if (!cfg) { btn.onclick = null; continue; }
+    btn.innerHTML = iconSvg(name);
+    btn.setAttribute('aria-label', cfg.label);
+    btn.onclick = cfg.go;
+  }
+}
+for (const el of document.querySelectorAll('[data-icon]')) el.innerHTML = iconSvg(el.dataset.icon);
+
 // ---------- router ----------
 function parseRoute() {
   const hash = location.hash.replace(/^#\/?/, '');
   const [name, arg] = hash.split('/');
+  if (name === 'today') return { name: 'day', date: todayKey() };
   if (name === 'day' && /^\d{4}-\d{2}-\d{2}$/.test(arg || '')) return { name: 'day', date: arg };
   if (name === 'settings') return { name: 'settings' };
   if (name === 'stats') return { name: 'stats' };
@@ -61,25 +84,19 @@ function parseRoute() {
 async function render() {
   revokeUrls();
   const route = parseRoute();
-  $back.hidden = route.name !== 'day';
-  $nav.hidden = route.name === 'day';
+  const active = route.name === 'day' ? (route.date === todayKey() ? 'today' : 'calendar')
+    : route.name === 'month' ? 'calendar' : route.name;
   for (const a of $nav.querySelectorAll('a')) {
-    a.setAttribute('aria-current', a.dataset.route === route.name ? 'page' : 'false');
+    a.setAttribute('aria-current', a.dataset.nav === active ? 'page' : 'false');
   }
   let view;
   if (route.name === 'day') view = await renderDay(route.date);
   else if (route.name === 'settings') view = renderSettings();
-  else if (route.name === 'stats') view = await renderDashboard($title);
+  else if (route.name === 'stats') view = await renderDashboard(setHeader);
   else view = await renderMonth(route.month);
   $app.replaceChildren(view);
   view.onMount?.();
 }
-
-$back.addEventListener('click', () => {
-  const route = parseRoute();
-  if (route.name === 'day') location.hash = `#/month/${route.date.slice(0, 7)}`;
-  else location.hash = '#/';
-});
 window.addEventListener('hashchange', render);
 
 // ---------- month (calendar) view ----------
@@ -91,10 +108,16 @@ async function renderMonth(month) {
   const byDate = Object.fromEntries(days.map((d) => [d.date, d]));
   const goal = getGoal();
   const today = todayKey();
-  $title.textContent = `${y}年${m}月`;
-
+  const thisMonth = today.slice(0, 7);
   const prevMonth = toKey(new Date(y, m - 2, 1)).slice(0, 7);
   const nextMonth = toKey(new Date(y, m, 1)).slice(0, 7);
+  setHeader({
+    title: `${y}年${m}月`,
+    subtitle: month === thisMonth ? '' : 'タップで今月へ',
+    prev: { label: '前の月', go: () => { location.hash = `#/month/${prevMonth}`; } },
+    next: { label: '次の月', go: () => { location.hash = `#/month/${nextMonth}`; } },
+    onTitle: month === thisMonth ? null : () => { location.hash = `#/month/${thisMonth}`; },
+  });
 
   const weeks = Math.ceil((first.getDay() + last.getDate()) / 7);
   const grid = h('div', { class: 'cal-grid', style: `grid-template-rows: auto repeat(${weeks}, 1fr)` },
@@ -108,36 +131,36 @@ async function renderMonth(month) {
     const total = rec ? dayTotal(rec) : 0;
     if (total > 0) { monthTotal += total; recordedDays++; }
     const dots = rec ? MEAL_TYPES.filter((t) => hasContent(rec.meals[t.id])) : [];
+    const exercised = rec && exerciseTotal(rec) > 0;
     const over = total > goal;
     const wd = new Date(y, m - 1, d).getDay();
     grid.append(h('button', {
       class: `cal-cell${key === today ? ' today' : ''}${key > today ? ' future' : ''}`,
-      onclick: () => { location.hash = `#/day/${key}`; },
-      'aria-label': `${m}月${d}日 ${total ? `${total}kcal` : '記録なし'}`,
+      onclick: () => { location.hash = key === today ? '#/today' : `#/day/${key}`; },
+      'aria-label': `${m}月${d}日 ${total ? `${total}kcal` : '記録なし'}${exercised ? ' 運動あり' : ''}`,
     },
     h('span', { class: `cal-num wd-${wd}` }, d),
-    h('span', { class: 'cal-dots' }, dots.map((t) => h('i', { class: `dot dot-${t.id}` }))),
+    h('span', { class: 'cal-dots' },
+      dots.map((t) => h('i', { class: `dot dot-${t.id}` })),
+      exercised ? h('i', { class: 'dot dot-exercise' }) : null),
     total ? h('span', { class: `cal-kcal${over ? ' over' : ''}` }, fmt(total)) : null));
   }
 
   const avg = recordedDays ? Math.round(monthTotal / recordedDays) : 0;
   return h('div', { class: 'view month-view' },
-    h('div', { class: 'month-nav' },
-      h('button', { class: 'icon-btn', 'aria-label': '前の月', onclick: () => { location.hash = `#/month/${prevMonth}`; } }, '‹'),
-      h('button', { class: 'today-btn', onclick: () => { location.hash = `#/day/${today}`; } }, '今日を記録'),
-      h('button', { class: 'icon-btn', 'aria-label': '次の月', onclick: () => { location.hash = `#/month/${nextMonth}`; } }, '›')),
     grid,
     h('div', { class: 'legend' },
       MEAL_TYPES.map((t) => h('span', {}, h('i', { class: `dot dot-${t.id}` }), t.label)),
-      h('span', {}, h('b', { class: 'over-sample' }, '赤字'), `= 目標${fmt(goal)}kcal超`)),
-    h('div', { class: 'stats' },
-      h('div', { class: 'stat' }, h('small', {}, '記録日数'), h('strong', {}, `${recordedDays}日`)),
-      h('div', { class: 'stat' }, h('small', {}, '1日平均'), h('strong', {}, `${fmt(avg)}kcal`)),
-      h('div', { class: 'stat' }, h('small', {}, '月合計'), h('strong', {}, `${fmt(monthTotal)}kcal`))));
+      h('span', {}, h('i', { class: 'dot dot-exercise' }), '運動'),
+      h('span', {}, h('b', { class: 'over-sample' }, '赤字'), `=目標${fmt(goal)}超`)),
+    h('div', { class: 'month-summary' },
+      h('span', {}, '記録 ', h('strong', {}, recordedDays), '日'),
+      h('span', {}, '平均 ', h('strong', {}, fmt(avg)), 'kcal'),
+      h('span', {}, '合計 ', h('strong', {}, fmt(monthTotal)), 'kcal')));
 }
 
 // ---------- day view ----------
-// Selected meal tab, kept across re-renders of the same day.
+// Selected tab, kept across re-renders of the same day.
 let dayTab = { date: null, index: 0 };
 
 function defaultMealIndex(date) {
@@ -152,28 +175,34 @@ function defaultMealIndex(date) {
 async function renderDay(date) {
   const day = await getDay(date);
   const d = fromKey(date);
-  $title.textContent = `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAYS[d.getDay()]})`;
+  const isToday = date === todayKey();
+  const go = (key) => { location.hash = key === todayKey() ? '#/today' : `#/day/${key}`; };
+  setHeader({
+    title: `${d.getMonth() + 1}月${d.getDate()}日(${WEEKDAYS[d.getDay()]})`,
+    subtitle: isToday ? '今日' : 'タップで今日へ',
+    prev: { label: '前の日', go: () => go(addDays(date, -1)) },
+    next: { label: '次の日', go: () => go(addDays(date, 1)) },
+    onTitle: isToday ? null : () => go(todayKey()),
+  });
   const goal = getGoal();
   const total = dayTotal(day);
+  const burned = exerciseTotal(day);
   const pct = Math.min(100, Math.round((total / goal) * 100));
   const remain = goal - total;
   if (dayTab.date !== date) dayTab = { date, index: defaultMealIndex(date) };
 
   const save = async () => { await putDay(day); await render(); };
 
-  const tabs = MEAL_TYPES.map((t, i) => {
-    const sub = mealTotal(day.meals[t.id]);
-    return h('button', {
-      class: `tab tab-${t.id}`, role: 'tab',
-      onclick: () => selectTab(i, true),
-    },
-    h('span', { class: 'tab-label' }, t.icon, ' ', t.label),
-    h('span', { class: 'tab-kcal' }, sub ? fmt(sub) : hasContent(day.meals[t.id]) ? '✓' : '—'));
-  });
-  const burned = exerciseTotal(day);
-  tabs.push(h('button', { class: 'tab tab-exercise', role: 'tab', onclick: () => selectTab(MEAL_TYPES.length, true) },
-    h('span', { class: 'tab-label' }, '🏃 運動'),
-    h('span', { class: 'tab-kcal' }, burned ? `-${fmt(burned)}` : day.exercises.length ? '✓' : '—')));
+  const tabDefs = [
+    ...MEAL_TYPES.map((t) => {
+      const sub = mealTotal(day.meals[t.id]);
+      return { id: t.id, label: t.label, value: sub ? fmt(sub) : hasContent(day.meals[t.id]) ? '✓' : '—' };
+    }),
+    { id: 'exercise', label: '運動', value: burned ? `-${fmt(burned)}` : day.exercises.length ? '✓' : '—' },
+  ];
+  const tabs = tabDefs.map((t, i) => h('button', {
+    class: `tab tab-${t.id}`, role: 'tab', onclick: () => selectTab(i, true),
+  }, h('span', { class: 'tab-label' }, t.label), h('span', { class: 'tab-kcal' }, t.value)));
 
   const panels = h('div', { class: 'panels' });
   for (const type of MEAL_TYPES) panels.append(await renderMealCard(day, type, save));
@@ -195,17 +224,13 @@ async function renderDay(date) {
   });
 
   const view = h('div', { class: 'view day-view' },
-    h('div', { class: 'day-nav' },
-      h('button', { class: 'icon-btn', 'aria-label': '前の日', onclick: () => { location.hash = `#/day/${addDays(date, -1)}`; } }, '‹'),
-      h('div', { class: 'day-summary' },
-        h('div', { class: 'day-total' }, h('strong', {}, fmt(total)), ` / ${fmt(goal)} kcal`,
-          h('small', { class: remain < 0 ? 'over-text' : '' },
-            remain < 0 ? `${fmt(-remain)} オーバー` : `あと ${fmt(remain)}`),
-          date !== todayKey()
-            ? h('button', { class: 'today-chip', onclick: () => { location.hash = `#/day/${todayKey()}`; } }, '今日へ')
-            : null),
-        h('div', { class: 'bar' }, h('div', { class: `bar-fill${remain < 0 ? ' over' : ''}`, style: `width:${pct}%` }))),
-      h('button', { class: 'icon-btn', 'aria-label': '次の日', onclick: () => { location.hash = `#/day/${addDays(date, 1)}`; } }, '›')),
+    h('div', { class: 'day-summary' },
+      h('div', { class: 'day-total' },
+        h('span', {}, h('small', {}, '摂取 '), h('strong', {}, fmt(total)), h('small', {}, ` / ${fmt(goal)} kcal`)),
+        h('span', { class: `remain${remain < 0 ? ' over-text' : ''}` },
+          remain < 0 ? `${fmt(-remain)} オーバー` : `あと ${fmt(remain)}`)),
+      h('div', { class: 'bar' }, h('div', { class: `bar-fill${remain < 0 ? ' over' : ''}`, style: `width:${pct}%` })),
+      burned ? h('div', { class: 'day-burn' }, `運動 -${fmt(burned)} kcal`) : null),
     h('div', { class: 'tabs', role: 'tablist' }, tabs),
     panels);
 
@@ -216,24 +241,29 @@ async function renderDay(date) {
   return view;
 }
 
+function actionButton(iconName, label, attrs = {}) {
+  return h('button', { class: 'action-btn', ...attrs }, icon(iconName, 18), label);
+}
+
 async function renderMealCard(day, type, save) {
   const meal = day.meals[type.id];
   const subtotal = mealTotal(meal);
 
   const items = h('ul', { class: 'items' },
     meal.items.map((it, idx) => h('li', {},
-      h('button', { class: 'item-main', onclick: () => openItemSheet(type, it, async (next) => {
+      h('button', { class: 'item-main', 'aria-label': `${it.name} ${it.kcal}kcal を編集`, onclick: () => openItemSheet(type, it, async (next) => {
         if (next) meal.items[idx] = next; else meal.items.splice(idx, 1);
         await save();
       }) },
       h('span', { class: 'item-name' }, it.name || '(無題)'),
-      h('span', { class: 'item-kcal' }, `${fmt(it.kcal)} kcal`)))));
+      h('span', { class: 'item-kcal' }, `${fmt(it.kcal)} kcal`),
+      icon('chevron-right', 16)))));
 
-  const photos = h('div', { class: 'photos' });
+  const thumbs = [];
   for (const id of meal.photos) {
     const p = await getPhoto(id);
     if (!p) continue;
-    photos.append(h('button', { class: 'thumb', 'aria-label': '写真を表示', onclick: () => openPhotoViewer(p, async () => {
+    thumbs.push(h('button', { class: 'thumb', 'aria-label': '写真を表示', onclick: () => openPhotoViewer(p, async () => {
       meal.photos = meal.photos.filter((x) => x !== id);
       await deletePhoto(id);
       await save();
@@ -258,11 +288,10 @@ async function renderMealCard(day, type, save) {
       await save();
     },
   });
-  photos.append(h('label', { class: 'thumb add-photo', 'aria-label': '写真を追加' }, fileInput, h('span', {}, '📷'), h('small', {}, '写真')));
 
   let memoTimer;
   const memo = h('textarea', {
-    class: 'memo', rows: 1, placeholder: 'メモ',
+    class: 'memo', rows: 1, placeholder: 'メモを追加',
     oninput: (e) => {
       meal.memo = e.target.value;
       clearTimeout(memoTimer);
@@ -272,15 +301,19 @@ async function renderMealCard(day, type, save) {
   });
   memo.value = meal.memo;
 
-  return h('section', { class: `card meal meal-${type.id}`, role: 'tabpanel' },
+  const empty = !meal.items.length;
+  return h('section', { class: `card meal meal-${type.id}`, role: 'tabpanel', 'aria-label': type.label },
     h('header', { class: 'meal-head' },
-      h('h2', {}, h('span', { class: 'meal-icon' }, type.icon), type.label),
+      h('h2', {}, type.label),
       h('span', { class: 'meal-kcal' }, subtotal ? `${fmt(subtotal)} kcal` : '')),
-    h('div', { class: 'items-wrap' }, items, meal.items.length ? null : h('p', { class: 'empty' }, 'まだ記録がありません')),
-    h('button', { class: 'add-btn', onclick: () => openItemSheet(type, null, async (next) => {
-      if (next) { meal.items.push(next); await save(); }
-    }) }, '＋ 食べたものを追加'),
-    photos,
+    h('div', { class: 'items-wrap' }, items,
+      empty ? h('p', { class: 'empty' }, `${type.label}はまだ記録がありません`) : null),
+    thumbs.length ? h('div', { class: 'photos' }, thumbs) : null,
+    h('div', { class: 'actions' },
+      actionButton('plus', '食事を追加', { class: 'action-btn primary-soft', onclick: () => openItemSheet(type, null, async (next) => {
+        if (next) { meal.items.push(next); await save(); }
+      }) }),
+      h('label', { class: 'action-btn', 'aria-label': '写真を追加' }, fileInput, icon('camera', 18), '写真')),
     memo);
 }
 
@@ -288,23 +321,25 @@ function renderExerciseCard(day, save) {
   const total = exerciseTotal(day);
   const items = h('ul', { class: 'items' },
     day.exercises.map((ex, idx) => h('li', {},
-      h('button', { class: 'item-main', onclick: () => openExerciseSheet(ex, async (next) => {
+      h('button', { class: 'item-main', 'aria-label': `${ex.name} を編集`, onclick: () => openExerciseSheet(ex, async (next) => {
         if (next) day.exercises[idx] = next; else day.exercises.splice(idx, 1);
         await save();
       }) },
       h('span', { class: 'item-name' }, ex.name || '運動', ex.minutes ? h('small', { class: 'item-sub' }, ` ${ex.minutes}分`) : null),
-      h('span', { class: 'item-kcal' }, `-${fmt(ex.kcal)} kcal`)))));
+      h('span', { class: 'item-kcal' }, `-${fmt(ex.kcal)} kcal`),
+      icon('chevron-right', 16)))));
 
-  return h('section', { class: 'card meal meal-exercise', role: 'tabpanel' },
+  return h('section', { class: 'card meal meal-exercise', role: 'tabpanel', 'aria-label': '運動' },
     h('header', { class: 'meal-head' },
-      h('h2', {}, h('span', { class: 'meal-icon' }, '🏃'), '運動'),
+      h('h2', {}, '運動'),
       h('span', { class: 'meal-kcal' }, total ? `-${fmt(total)} kcal` : '')),
     h('div', { class: 'items-wrap' }, items,
-      day.exercises.length ? null : h('p', { class: 'empty' }, 'まだ記録がありません')),
-    h('button', { class: 'add-btn', onclick: () => openExerciseSheet(null, async (next) => {
-      if (next) { day.exercises.push(next); await save(); }
-    }) }, '＋ 運動を追加'),
-    h('p', { class: 'hint' }, 'Apple Watch等の値はアクティブカロリーをそのまま入力できます'));
+      day.exercises.length ? null : h('p', { class: 'empty' }, '運動はまだ記録がありません')),
+    h('div', { class: 'actions' },
+      actionButton('plus', '運動を追加', { class: 'action-btn primary-soft', onclick: () => openExerciseSheet(null, async (next) => {
+        if (next) { day.exercises.push(next); await save(); }
+      }) })),
+    h('p', { class: 'hint' }, 'Apple Watchの値は「アクティブカロリー」を入力'));
 }
 
 // ---------- bottom sheet: add / edit item ----------
@@ -344,7 +379,7 @@ function openItemSheet(type, item, onDone) {
     }, p.name, h('small', {}, p.kcal))));
 
   const form = h('form', { class: 'item-form', onsubmit: submit },
-    h('h3', {}, `${type.icon} ${type.label}：${item ? '編集' : '追加'}`),
+    h('h3', {}, `${type.label}を${item ? '編集' : '追加'}`),
     h('label', {}, '料理名', name),
     h('label', {}, 'カロリー (kcal)', kcal),
     h('p', { class: 'hint' }, 'よく食べるもの（タップで加算）'),
@@ -399,7 +434,7 @@ function openExerciseSheet(ex, onDone) {
     }, p.name)));
 
   const form = h('form', { class: 'item-form', onsubmit: submit },
-    h('h3', {}, `🏃 運動：${ex ? '編集' : '追加'}`),
+    h('h3', {}, `運動を${ex ? '編集' : '追加'}`),
     h('label', {}, '種目', name),
     h('div', { class: 'row2' },
       h('label', {}, '時間 (分)', minutes),
@@ -477,7 +512,7 @@ async function importData(file) {
 let settingsTab = 'profile';
 
 function renderSettings() {
-  $title.textContent = '設定';
+  setHeader({ title: '設定' });
   const tabs = [['profile', '基本情報'], ['goal', '目標'], ['data', 'データ']];
   const seg = h('div', { class: 'segment', role: 'tablist' },
     tabs.map(([id, label]) => h('button', {
@@ -524,11 +559,11 @@ function renderProfileForm() {
     setProfile(f); toast('保存しました');
   } },
   h('div', { class: 'grid2' },
-    h('label', {}, '性別', sex),
-    h('label', {}, '年齢', age),
-    h('label', {}, '身長 (cm)', height),
-    h('label', {}, '体重 (kg)', weight)),
-  h('label', {}, '普段の活動量（運動は別に記録）', activity),
+    h('label', { class: 'field' }, '性別', sex),
+    h('label', { class: 'field' }, '年齢', age),
+    h('label', { class: 'field' }, '身長 (cm)', height),
+    h('label', { class: 'field' }, '体重 (kg)', weight)),
+  h('label', { class: 'field' }, '普段の活動量（運動は別に記録）', activity),
   result,
   h('button', { class: 'primary block', type: 'submit' }, '保存'));
 }
