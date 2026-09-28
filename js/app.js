@@ -280,6 +280,12 @@ function actionButton(iconName, label, attrs = {}) {
 }
 
 // Exercise / weight / water / PFC at a glance; weight and water are tappable.
+// Autofocus a sheet's first field, unless the user already moved to another field.
+function focusUnlessTyping(el) {
+  const a = document.activeElement;
+  if (!a || !['INPUT', 'TEXTAREA', 'SELECT'].includes(a.tagName)) el.focus();
+}
+
 function renderDayChips(day, save) {
   const pfc = sumPfc(dayItems(day));
   const chip = (label, value, onclick, cls = '') => h(onclick ? 'button' : 'span', { class: `day-chip ${cls}`, onclick, type: onclick ? 'button' : null },
@@ -617,7 +623,7 @@ function openItemSheet(type, item, onDone) {
       h('button', { type: 'submit', class: 'primary' }, '保存')));
 
   close = openSheet(form);
-  if (!item) setTimeout(() => name.focus(), 50);
+  if (!item) setTimeout(() => focusUnlessTyping(name), 50);
 }
 
 function openExerciseSheet(ex, onDone) {
@@ -676,7 +682,7 @@ function openExerciseSheet(ex, onDone) {
       h('button', { type: 'submit', class: 'primary' }, '保存')));
 
   close = openSheet(form);
-  if (!ex) setTimeout(() => name.focus(), 50);
+  if (!ex) setTimeout(() => focusUnlessTyping(name), 50);
 }
 
 // ---------- photo viewer ----------
