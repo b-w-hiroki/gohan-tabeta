@@ -975,7 +975,7 @@ function renderLogin() {
     submit.textContent = m === 'login' ? 'ログイン' : '新規登録';
     password.autocomplete = m === 'login' ? 'current-password' : 'new-password';
     toggle.textContent = m === 'login' ? 'はじめての方は新規登録' : 'アカウントをお持ちの方はログイン';
-    note.textContent = m === 'login' ? '' : '登録すると、プライバシーポリシーに同意したものとみなします。';
+    note.textContent = m === 'login' ? '' : '登録すると、利用規約とプライバシーポリシーに同意したものとみなします。';
     error.hidden = true;
   };
   toggle.addEventListener('click', () => setMode(mode === 'login' ? 'signup' : 'login'));
@@ -1019,7 +1019,8 @@ function renderLogin() {
       } }, 'ログインせずに使う'),
       h('small', {}, 'ログインしない場合、記録はこの端末だけに保存されます。ログインすると機種変更や複数の端末でも記録を引き継げます。')),
     h('p', { class: 'auth-footer' },
-      h('a', { href: './' }, 'ごはん食べたについて'), ' ・ ', h('a', { href: './privacy.html' }, 'プライバシーポリシー'))));
+      h('a', { href: './' }, 'ごはん食べたについて'), ' ・ ', h('a', { href: './terms.html' }, '利用規約'),
+      ' ・ ', h('a', { href: './privacy.html' }, 'プライバシーポリシー'))));
 }
 
 function googleMark() {
