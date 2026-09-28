@@ -96,6 +96,11 @@ export function exerciseTotal(day) {
   return (day.exercises || []).reduce((sum, ex) => sum + (Number(ex.kcal) || 0), 0);
 }
 
+// All food items of a day, across meals.
+export function dayItems(day) {
+  return MEAL_TYPES.flatMap((t) => day.meals[t.id]?.items || []);
+}
+
 export function mealTotal(meal) {
   if (!meal) return 0;
   return meal.items.reduce((sum, it) => sum + (Number(it.kcal) || 0), 0);

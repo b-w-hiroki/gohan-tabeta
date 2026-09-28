@@ -1,8 +1,8 @@
 // Dashboard: calorie trends for a week, a month, or the last N days.
-import { MEAL_TYPES, getDaysInRange, dayTotal, mealTotal, exerciseTotal } from './db.js';
+import { MEAL_TYPES, getDaysInRange, dayTotal, mealTotal, exerciseTotal, dayItems } from './db.js';
 import {
   WEEKDAYS, toKey, fromKey, todayKey, addDays, daysBetween, fmt, shortDate, h, getGoal,
-  getProfile, isProfileComplete, calcTdee, KCAL_PER_KG, icon,
+  getProfile, isProfileComplete, calcTdee, KCAL_PER_KG, icon, sumPfc, fmtLiters, round1,
 } from './util.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -10,7 +10,7 @@ const MAX_DAILY_BARS = 62; // Longer ranges are shown as weekly averages.
 
 // Period selection survives navigation within the session.
 const RANGE_PRESETS = [7, 30, 90, 365];
-const state = { mode: 'week', anchor: todayKey(), days: 30 };
+const state = { mode: 'week', anchor: todayKey(), days: 30, chart: 'kcal' };
 
 function weekStart(key) {
   const d = fromKey(key);
@@ -141,6 +141,65 @@ function drawChart(box, bars, unit, goal, onSelect, selectedKey) {
   box.append(root);
 }
 
+// Weight chart: measured weights (solid) and the estimate from the energy balance (dashed),
+// starting at the first measured weight in the period.
+function drawWeightChart(box, from, to, byDate, tdee) {
+  box.replaceChildren();
+  const W = box.clientWidth; const H = box.clientHeight;
+  if (W < 60 || H < 50) return;
+  const last = to < todayKey() ? to : todayKey();
+  const n = daysBetween(from, to) + 1;
+  const measured = [];
+  for (let i = 0; i < n; i++) {
+    const key = addDays(from, i);
+    if (byDate[key]?.weight) measured.push({ i, key, v: byDate[key].weight });
+  }
+  if (!measured.length) {
+    box.append(h('p', { class: 'chart-empty' }, '日ごとの画面で「体重」を記録すると、ここにグラフが表示されます'));
+    return;
+  }
+  const estimate = [];
+  if (tdee) {
+    let bal = 0;
+    for (let i = measured[0].i; i < n; i++) {
+      const key = addDays(from, i);
+      if (key > last) break;
+      const d = byDate[key];
+      if (d && dayTotal(d) > 0) bal += tdee + exerciseTotal(d) - dayTotal(d);
+      estimate.push({ i, v: measured[0].v - bal / KCAL_PER_KG });
+    }
+  }
+  const all = [...measured, ...estimate].map((p) => p.v);
+  let lo = Math.min(...all); let hi = Math.max(...all);
+  if (hi - lo < 1) { const mid = (hi + lo) / 2; lo = mid - 0.5; hi = mid + 0.5; }
+  lo -= 0.3; hi += 0.3;
+  const pad = { l: 40, r: 8, t: 10, b: 20 };
+  const iw = W - pad.l - pad.r; const ih = H - pad.t - pad.b;
+  const x = (i) => pad.l + (n === 1 ? iw / 2 : (i / (n - 1)) * iw);
+  const y = (v) => pad.t + ih - ((v - lo) / (hi - lo)) * ih;
+  const root = svg('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': '体重の推移' });
+  for (const v of [lo + 0.3, hi - 0.3]) {
+    root.append(svg('line', { x1: pad.l, x2: W - pad.r, y1: y(v), y2: y(v), class: 'grid' }));
+    const t = svg('text', { x: pad.l - 4, y: y(v) + 4, 'text-anchor': 'end', class: 'tick' });
+    t.textContent = round1(v).toFixed(1);
+    root.append(t);
+  }
+  if (estimate.length > 1) {
+    root.append(svg('polyline', { points: estimate.map((p) => `${x(p.i)},${y(p.v)}`).join(' '), class: 'w-est' }));
+  }
+  if (measured.length > 1) {
+    root.append(svg('polyline', { points: measured.map((p) => `${x(p.i)},${y(p.v)}`).join(' '), class: 'w-line' }));
+  }
+  for (const p of measured) root.append(svg('circle', { cx: x(p.i), cy: y(p.v), r: 4, class: 'w-dot' }));
+  const every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(iw / 44))));
+  for (let i = 0; i < n; i += every) {
+    const t = svg('text', { x: x(i), y: H - 4, 'text-anchor': 'middle', class: 'tick' });
+    t.textContent = shortDate(addDays(from, i));
+    root.append(t);
+  }
+  box.append(root);
+}
+
 export async function renderDashboard(setHeader) {
   setHeader({ title: 'ダッシュボード' });
   const goal = getGoal();
@@ -229,8 +288,33 @@ export async function renderDashboard(setHeader) {
       h('span', { class: 'muted' }, ` ${when}`),
       b.from === b.to ? h('a', { class: 'readout-link', href: `#/day/${b.from}` }, 'この日を開く ›') : null);
   };
-  const draw = () => drawChart(chartBox, bars, unit, goal, (b) => { showReadout(b); draw(); }, selectedKey);
-  showReadout(null);
+  const isWeight = state.chart === 'weight';
+  const draw = () => (isWeight
+    ? drawWeightChart(chartBox, from, to, byDate, tdee)
+    : drawChart(chartBox, bars, unit, goal, (b) => { showReadout(b); draw(); }, selectedKey));
+  if (isWeight) {
+    const ws = days.filter((d) => d.weight).sort((a, b) => (a.date < b.date ? -1 : 1));
+    const change = ws.length > 1 ? round1(ws[ws.length - 1].weight - ws[0].weight) : null;
+    readout.replaceChildren(ws.length
+      ? h('span', {}, h('strong', {}, `${ws[ws.length - 1].weight}kg`),
+        h('span', { class: 'muted' }, ` 最新${change != null ? `・期間 ${change > 0 ? '+' : ''}${change}kg` : ''}`))
+      : h('span', { class: 'muted' }, '体重の記録がありません'));
+  } else {
+    showReadout(null);
+  }
+
+  // PFC and water averages over days that have them.
+  const pfcDays = days.map((d) => sumPfc(dayItems(d))).filter((t) => t.has);
+  const avgOf = (arr, k) => Math.round(arr.reduce((a, t) => a + t[k], 0) / arr.length);
+  const waterDays = days.filter((d) => d.water);
+  const extras = [
+    pfcDays.length ? `PFC平均(入力分) P${avgOf(pfcDays, 'p')}・F${avgOf(pfcDays, 'f')}・C${avgOf(pfcDays, 'c')}g` : null,
+    waterDays.length ? `水分平均 ${fmtLiters(waterDays.reduce((a, d) => a + d.water, 0) / waterDays.length)}` : null,
+  ].filter(Boolean);
+  const chartTabs = h('div', { class: 'segment segment-mini chart-tabs', role: 'tablist' },
+    [['kcal', 'カロリー'], ['weight', '体重']].map(([k, l]) => h('button', {
+      role: 'tab', 'aria-selected': String(state.chart === k), onclick: () => { state.chart = k; rerender(); },
+    }, l)));
 
   const meals = h('div', { class: 'meal-bars' },
     mealAvg.map((m) => h('div', { class: 'meal-bar-row' },
@@ -243,13 +327,17 @@ export async function renderDashboard(setHeader) {
     seg, periodRow, kpis, balanceNote,
     h('section', { class: 'card chart-card' },
       h('div', { class: 'chart-head' },
-        h('h2', {}, unit === 'week' ? '週平均カロリー' : '日別カロリー'),
-        h('span', { class: 'chart-legend' },
-          h('i', { class: 'key key-bar' }), '目標内', h('i', { class: 'key key-over' }), '超過',
-          h('i', { class: 'key key-goal' }), `目標${fmt(goal)}`)),
+        chartTabs,
+        isWeight
+          ? h('span', { class: 'chart-legend' },
+            h('i', { class: 'key key-wline' }), '実測', tdee ? [h('i', { class: 'key key-west' }), '推定'] : null)
+          : h('span', { class: 'chart-legend' },
+            h('i', { class: 'key key-bar' }), '目標内', h('i', { class: 'key key-over' }), '超過',
+            h('i', { class: 'key key-goal' }), `目標${fmt(goal)}`)),
       readout, chartBox),
     h('section', { class: 'card meal-card' },
-      h('h2', {}, '食事別の平均 (kcal/日)'), meals));
+      h('h2', {}, '食事別の平均 (kcal/日)'), meals,
+      extras.length ? h('p', { class: 'meal-extras' }, extras.join('　')) : null));
 
   // Redraw whenever the chart area changes size (rotation, the balance note opening, etc.).
   view.onMount = () => {

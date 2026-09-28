@@ -1,0 +1,13 @@
+{
+  "name": "gohan-tabeta",
+  "private": true,
+  "description": "食事・運動・カロリーをカレンダーで記録するPWA",
+  "type": "module",
+  "scripts": {
+    "check": "for f in js/*.js sw.js; do node --check \"$f\" || exit 1; done",
+    "test": "npm run check && node tests/run-all.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
+}
