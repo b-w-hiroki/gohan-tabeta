@@ -379,7 +379,7 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); ou
 .balance-note { flex: none; margin: 0; font-size: 12px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 6px 10px; }
 
 .chart-card { flex: 1; min-height: 160px; display: flex; flex-direction: column; overflow: hidden; }
-.chart-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 8px; }
+.chart-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 8px; }
 .chart-head h2 { margin: 0; white-space: nowrap; }
 .chart-legend { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--muted); white-space: nowrap; }
 .key { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-left: 6px; }
@@ -402,13 +402,18 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); ou
 .chart-box .bar:focus-visible .hit, .chart-box .bar.selected .hit { fill: var(--accent-weak); opacity: .7; }
 
 .meal-card { flex: none; }
-.meal-card h2 { margin-bottom: 6px; }
-.meal-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; }
-.meal-bar-row { display: grid; grid-template-columns: 1fr auto; align-items: baseline; row-gap: 2px; font-size: 13px; }
-.meal-bar-label { color: var(--muted); }
-.meal-bar-value { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
-.meal-bar-track { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
-.meal-bar-fill { display: block; height: 100%; border-radius: 0 3px 3px 0; }
+.meal-card h2 { margin: 0 0 8px; }
+.meal-card h2 .unit { margin-left: 6px; font-weight: 400; font-size: 11px; color: var(--muted); }
+.meal-extras { display: flex; align-items: baseline; gap: 12px; margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border); }
+.meal-extras > small { color: var(--muted); font-size: 11px; }
+.extra { display: inline-flex; align-items: baseline; gap: 3px; white-space: nowrap; font-size: 13px; font-variant-numeric: tabular-nums; }
+.extra small { color: var(--muted); font-size: 11px; }
+.meal-stack { display: flex; gap: 2px; height: 10px; border-radius: 5px; overflow: hidden; background: var(--surface-2); }
+.meal-stack span { min-width: 3px; }
+.meal-values { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 6px; }
+.meal-value { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.meal-value small { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 11px; }
+.meal-value b { font-size: 15px; font-variant-numeric: tabular-nums; }
 
 /* ==========================================================================
    Settings
@@ -430,6 +435,8 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); ou
 .watch-banner p { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: var(--accent-ink); }
 .watch-banner .watch-paste { flex: 1; }
 .watch-banner small { color: var(--muted); font-size: 12px; text-align: center; }
+.watch-hint { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.watch-hint .text-btn { flex: none; min-height: 32px; font-size: 13px; }
 .text-btn { color: var(--accent-ink); font-size: 12px; font-weight: 700; text-decoration: underline; padding: 0; }
 
 /* Shortcut integration guide */
@@ -461,7 +468,6 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); ou
   .chart-box { min-height: 60px; }
   .chart-card { min-height: 0; }
   .presets-row .chip { min-height: 34px; font-size: 13px; }
-  .meal-bars { row-gap: 2px; }
   .energy-item strong { font-size: 16px; }
   .month-summary { padding: 6px; }
 }
@@ -522,15 +528,18 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 /* ==========================================================================
    Weight / water / PFC / my menu
    ========================================================================== */
-.day-chips { display: flex; gap: 6px; margin-top: 6px; overflow-x: auto; scrollbar-width: none; }
-.day-chips::-webkit-scrollbar { display: none; }
+.day-chips { display: grid; grid-template-columns: 1fr 1fr 1.25fr; gap: 6px; margin-top: 6px; }
 .day-chip {
-  flex: none; display: inline-flex; align-items: baseline; gap: 4px; min-height: 32px; padding: 4px 10px;
+  min-width: 0; display: inline-flex; align-items: baseline; justify-content: center; gap: 4px; min-height: 32px; padding: 4px 8px;
+  white-space: nowrap; overflow: hidden;
   border-radius: 999px; background: var(--surface); border: 1px solid var(--border); font-size: 13px; color: var(--text);
   font-variant-numeric: tabular-nums;
 }
 .day-chip small { color: var(--muted); font-size: 11px; }
 .day-chip.empty b { color: var(--accent-ink); font-weight: 700; }
+.day-chip b { overflow: hidden; text-overflow: ellipsis; }
+.day-chip.none b { color: var(--muted); font-weight: 400; }
+button.day-chip { cursor: pointer; }
 button.day-chip:active { background: var(--surface-2); }
 
 .water-now { text-align: center; }
@@ -540,7 +549,7 @@ button.day-chip:active { background: var(--surface-2); }
 .water-btns .chip { min-height: 48px; font-weight: 700; }
 
 .pfc-details { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 0 10px; }
-.pfc-details summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--accent-ink); padding: 10px 0; }
+.pfc-details summary { cursor: pointer; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 700; color: var(--accent-ink); padding: 10px 0; }
 .pfc-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding-bottom: 10px; }
 .pfc-row label { font-size: 11px; }
 .item-pfc { display: block; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
@@ -563,17 +572,22 @@ button.day-chip:active { background: var(--surface-2); }
 .menu-list .item-main { cursor: default; }
 .icon-btn.small { width: 36px; height: 36px; color: var(--muted); }
 
-.chart-tabs { width: 170px; }
+.chart-tabs { width: 128px; flex: none; }
 .key-wline { width: 12px; height: 0; border-radius: 0; border-top: 2.5px solid var(--accent); }
-.key-west { width: 12px; height: 0; border-radius: 0; border-top: 2px dashed var(--muted); }
+.key-west { width: 16px; height: 0; border-radius: 0; border-top: 2px dashed var(--muted); }
 .chart-box .w-line { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; }
 .chart-box .w-est { fill: none; stroke: var(--muted); stroke-width: 2; stroke-dasharray: 5 4; }
 .chart-box .w-dot { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
 .chart-empty { margin: 0; height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--muted); font-size: 13px; padding: 0 16px; }
-.meal-extras { margin: 8px 0 0; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 @media (max-height: 700px) {
-  .day-chip { min-height: 28px; padding: 2px 8px; }
-  .meal-extras { margin-top: 4px; }
+  .day-chip { min-height: 28px; padding: 2px 6px; }
+  .meal-card h2 { margin-bottom: 4px; }
+  .meal-stack { height: 8px; }
+  .meal-values { margin-top: 4px; }
+  .meal-value b { font-size: 14px; line-height: 1.3; }
+  .meal-extras { margin-top: 4px; padding-top: 4px; }
+  .period { min-height: 34px; }
+  .readout { min-height: 20px; margin: 0; font-size: 13px; }
 }
 
 /* Settings has five tabs: keep them on one line. */
@@ -582,3 +596,5 @@ button.day-chip:active { background: var(--surface-2); }
   .link-panel { gap: 6px; }
   .link-panel .steps { gap: 4px; font-size: 13px; }
 }
+
+.month-summary.empty-hint { justify-content: center; color: var(--muted); font-size: 13px; }

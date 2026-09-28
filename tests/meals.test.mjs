@@ -28,7 +28,7 @@ export default {
     await page.waitForTimeout(400);
     const items = await itemsOf(page, 'breakfast');
     assertEq(JSON.stringify(items), JSON.stringify([{ name: 'オートミール', kcal: 150, p: 5.1, f: 2.4, c: 27 }]), 'saved item');
-    assertEq((await page.textContent('.day-chips')).includes('PFC'), true, 'PFC chip shown');
+    assertEq(await page.textContent('.day-chip.pfc b'), '5/2/27g', 'PFC chip totals');
     // It is offered again from "my menu".
     await page.click('.meal-breakfast .primary-soft'); await page.waitForSelector('.chip-mine');
     await page.click('.chip-mine');
