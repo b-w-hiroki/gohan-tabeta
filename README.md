@@ -29,7 +29,11 @@
 npx http-server -p 8080 .
 ```
 
-公開する場合は GitHub Pages（Settings → Pages → Deploy from a branch → `main` / root）で動く。
+## 公開
+- URL: https://gohan-tabeta.birdman-studio.com/
+- GitHub Pages（Settings → Pages → Deploy from a branch → `main` / root）。カスタムドメインはルートの `CNAME` で指定
+- DNS（birdman-studio.com）: `gohan-tabeta` の CNAME → `b-w-hiroki.github.io`
+- 記録データはドメインごとに保存されるため、URLを変更すると記録は引き継がれない（エクスポート／インポートで移行）
 
 ## データ保存について
 - データは**端末のブラウザ内（IndexedDB）にのみ**保存される。サーバ送信なし
