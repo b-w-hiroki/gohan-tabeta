@@ -327,13 +327,11 @@ body:has(.bottom-nav:not([hidden])) main { padding-bottom: 8px; }
 .period { flex: none; display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
 .period-label { font-size: 16px; font-variant-numeric: tabular-nums; }
 .period.range { flex-direction: column; align-items: stretch; gap: 6px; }
-.date-pair { display: flex; align-items: center; gap: 6px; }
-.date-pair input {
-  flex: 1; min-width: 0; padding: 8px; border-radius: 10px; font-size: 16px;
-  border: 1px solid var(--border); background: var(--surface);
-}
 .presets-row { display: flex; gap: 6px; }
-.presets-row .chip { flex: 1; padding: 6px 0; }
+.presets-row .chip { flex: 1; min-height: 40px; padding: 0; font-weight: 600; }
+.presets-row .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.period-sub { text-align: center; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.period.range { gap: 2px; }
 .dash-view .stats { flex: none; }
 .dash-view .stat strong { font-size: 18px; }
 .chart-card { flex: 1; min-height: 160px; display: flex; flex-direction: column; }
@@ -375,7 +373,6 @@ body:has(.bottom-nav:not([hidden])) main { padding-bottom: 8px; }
   .chart-box { min-height: 80px; }
   .chart-card { min-height: 0; }
   .meal-card h2 { margin-bottom: 2px; }
-  .presets-row .chip { padding: 4px 0; font-size: 13px; }
-  .date-pair input { padding: 6px; }
+  .presets-row .chip { min-height: 36px; font-size: 13px; }
   .meal-bars { gap: 2px; }
 }

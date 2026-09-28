@@ -1,4 +1,4 @@
-// Dashboard: calorie trends for a week, a month, or a custom date range.
+// Dashboard: calorie trends for a week, a month, or the last N days.
 import { MEAL_TYPES, getDaysInRange, dayTotal, mealTotal } from './db.js';
 import {
   WEEKDAYS, toKey, fromKey, todayKey, addDays, daysBetween, fmt, shortDate, h, getGoal,
@@ -8,7 +8,8 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const MAX_DAILY_BARS = 62; // Longer ranges are shown as weekly averages.
 
 // Period selection survives navigation within the session.
-const state = { mode: 'week', anchor: todayKey(), from: addDays(todayKey(), -29), to: todayKey() };
+const RANGE_PRESETS = [7, 30, 90, 365];
+const state = { mode: 'week', anchor: todayKey(), days: 30 };
 
 function weekStart(key) {
   const d = fromKey(key);
@@ -27,8 +28,10 @@ function currentRange() {
     const to = toKey(new Date(d.getFullYear(), d.getMonth() + 1, 0));
     return { from, to, label: `${d.getFullYear()}年${d.getMonth() + 1}月` };
   }
-  const [from, to] = state.from <= state.to ? [state.from, state.to] : [state.to, state.from];
-  return { from, to, label: `${shortDate(from)}〜${shortDate(to)}` };
+  const to = todayKey();
+  const from = addDays(to, -(state.days - 1));
+  const start = from.slice(0, 4) === to.slice(0, 4) ? shortDate(from) : `${from.slice(0, 4)}/${shortDate(from)}`;
+  return { from, to, label: `${start}〜${shortDate(to)}` };
 }
 
 function shift(dir) {
@@ -166,19 +169,13 @@ export async function renderDashboard($title) {
 
   let periodRow;
   if (state.mode === 'range') {
-    const fromIn = h('input', { type: 'date', value: state.from, max: todayKey(), 'aria-label': '開始日' });
-    const toIn = h('input', { type: 'date', value: state.to, max: todayKey(), 'aria-label': '終了日' });
-    const apply = () => {
-      if (!fromIn.value || !toIn.value) return;
-      state.from = fromIn.value; state.to = toIn.value; rerender();
-    };
-    fromIn.addEventListener('change', apply); toIn.addEventListener('change', apply);
-    const preset = (n) => h('button', { class: 'chip', onclick: () => {
-      state.to = todayKey(); state.from = addDays(state.to, -(n - 1)); rerender();
-    } }, `${n}日`);
     periodRow = h('div', { class: 'period range' },
-      h('div', { class: 'date-pair' }, fromIn, h('span', {}, '〜'), toIn),
-      h('div', { class: 'presets-row' }, preset(7), preset(30), preset(90), preset(365)));
+      h('div', { class: 'presets-row', role: 'group', 'aria-label': '集計期間' },
+        RANGE_PRESETS.map((n) => h('button', {
+          class: 'chip', 'aria-pressed': String(state.days === n),
+          onclick: () => { state.days = n; rerender(); },
+        }, `直近${n}日`))),
+      h('small', { class: 'period-sub' }, `${label}（今日まで）`));
   } else {
     periodRow = h('div', { class: 'period' },
       h('button', { class: 'icon-btn', 'aria-label': '前へ', onclick: () => { shift(-1); rerender(); } }, '‹'),
