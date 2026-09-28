@@ -180,11 +180,12 @@ async function renderMonth(month) {
     h('div', { class: 'legend' },
       MEAL_TYPES.map((t) => h('span', {}, h('i', { class: `dot dot-${t.id}` }), t.label)),
       h('span', {}, h('i', { class: 'dot dot-exercise' }), '運動'),
-      h('span', {}, h('b', { class: 'over-sample' }, '赤字'), `=目標${fmt(goal)}超`)),
-    h('div', { class: 'month-summary' },
+      h('span', { title: `目標${fmt(goal)}kcal` }, h('b', { class: 'over-sample' }, '赤字'), '=目標超')),
+    recordedDays ? h('div', { class: 'month-summary' },
       h('span', {}, '記録 ', h('strong', {}, recordedDays), '日'),
       h('span', {}, '平均 ', h('strong', {}, fmt(avg)), 'kcal'),
-      h('span', {}, '合計 ', h('strong', {}, fmt(monthTotal)), 'kcal')));
+      h('span', {}, '合計 ', h('strong', {}, fmt(monthTotal)), 'kcal'))
+      : h('div', { class: 'month-summary empty-hint' }, '日付をタップして食事を記録'));
 }
 
 // ---------- day view ----------
@@ -263,7 +264,7 @@ async function renderDay(date) {
         h('span', { class: `remain${remain < 0 ? ' over-text' : ''}` },
           remain < 0 ? `${fmt(-remain)} オーバー` : `あと ${fmt(remain)}`)),
       h('div', { class: 'bar' }, h('div', { class: `bar-fill${remain < 0 ? ' over' : ''}`, style: `width:${pct}%` })),
-      renderDayChips(day, burned, save)),
+      renderDayChips(day, save)),
     h('div', { class: 'tabs', role: 'tablist' }, tabs),
     panels);
 
@@ -279,15 +280,15 @@ function actionButton(iconName, label, attrs = {}) {
 }
 
 // Exercise / weight / water / PFC at a glance; weight and water are tappable.
-function renderDayChips(day, burned, save) {
+function renderDayChips(day, save) {
   const pfc = sumPfc(dayItems(day));
   const chip = (label, value, onclick, cls = '') => h(onclick ? 'button' : 'span', { class: `day-chip ${cls}`, onclick, type: onclick ? 'button' : null },
     h('small', {}, label), h('b', {}, value));
   return h('div', { class: 'day-chips' },
     chip('体重', day.weight ? `${day.weight}kg` : '記録', () => openWeightSheet(day, save), day.weight ? '' : 'empty'),
     chip('水分', day.water ? fmtLiters(day.water) : '記録', () => openWaterSheet(day, save), day.water ? '' : 'empty'),
-    burned ? chip('運動', `-${fmt(burned)}`) : null,
-    pfc.has ? chip('PFC', `${Math.round(pfc.p)}/${Math.round(pfc.f)}/${Math.round(pfc.c)}g`) : null);
+    // Exercise already shows on its own tab, so the third slot is the PFC total.
+    chip('PFC', pfc.has ? `${Math.round(pfc.p)}/${Math.round(pfc.f)}/${Math.round(pfc.c)}g` : '—', null, pfc.has ? 'pfc' : 'pfc none'));
 }
 
 function openWeightSheet(day, save) {
@@ -451,8 +452,8 @@ function renderExerciseCard(day, save) {
           if (next) { day.exercises.push(next); await save(); }
         }) }),
         actionButton('watch', 'Watch', { 'aria-label': 'ショートカットでApple Watchの値を取り込む', onclick: () => runWatchShortcut(day.date) })),
-    pending ? null : h('p', { class: 'hint' }, 'Watch：ショートカット実行後に戻って貼り付け　',
-      h('button', { class: 'text-btn', onclick: paste }, 'コピー済みの値を貼る')));
+    pending ? null : h('p', { class: 'hint watch-hint' }, 'Watchの消費カロリーをコピー済みなら',
+      h('button', { class: 'text-btn', onclick: paste }, '貼り付けて記録')));
 }
 
 // ---------- Apple Watch (via iOS Shortcuts) ----------
@@ -544,7 +545,7 @@ function openItemSheet(type, item, onDone) {
     if (item.c != null) c.value = item.c;
   }
   const pfcDetails = h('details', { class: 'pfc-details', open: item && (item.p != null || item.f != null || item.c != null) },
-    h('summary', {}, 'PFC（たんぱく質・脂質・炭水化物）を入力'),
+    h('summary', {}, 'PFC（たんぱく質・脂質・炭水化物）も入力'),
     h('div', { class: 'pfc-row' },
       h('label', {}, 'P たんぱく質(g)', p), h('label', {}, 'F 脂質(g)', f), h('label', {}, 'C 炭水化物(g)', c)));
 
@@ -892,7 +893,9 @@ function renderDataPanel() {
     : h('section', { class: 'card' },
       h('h2', {}, 'アカウント'),
       h('p', { class: 'hint' }, 'ログインせずに利用中。記録はこの端末だけに保存されています。'),
-      h('button', { class: 'secondary', onclick: () => { setAuthMode(null); location.reload(); } }, 'ログインしてクラウドに保存'));
+      isConfigured()
+        ? h('button', { class: 'secondary', onclick: () => { setAuthMode(null); location.reload(); } }, 'ログインしてクラウドに保存')
+        : h('p', { class: 'auth-notice' }, 'ログイン・クラウド同期は準備中です'));
   return h('div', {},
     account,
     h('section', { class: 'card' },
@@ -1039,7 +1042,8 @@ async function boot() {
   if (user) {
     try { await startCloud(user); } catch { toast('クラウドに接続できませんでした'); }
     render();
-  } else if (getAuthMode() === 'local') {
+  } else if (getAuthMode() === 'local' || !isConfigured()) {
+    // Until cloud sync is configured there is nothing to log in to: open the app directly.
     render();
   } else {
     renderLogin();

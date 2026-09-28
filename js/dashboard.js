@@ -174,8 +174,9 @@ function drawWeightChart(box, from, to, byDate, tdee) {
   if (hi - lo < 1) { const mid = (hi + lo) / 2; lo = mid - 0.5; hi = mid + 0.5; }
   lo -= 0.3; hi += 0.3;
   const pad = { l: 40, r: 8, t: 10, b: 20 };
+  const inset = 10; // keeps the first and last dots clear of the axis labels
   const iw = W - pad.l - pad.r; const ih = H - pad.t - pad.b;
-  const x = (i) => pad.l + (n === 1 ? iw / 2 : (i / (n - 1)) * iw);
+  const x = (i) => pad.l + inset + (n === 1 ? (iw - 2 * inset) / 2 : (i / (n - 1)) * (iw - 2 * inset));
   const y = (v) => pad.t + ih - ((v - lo) / (hi - lo)) * ih;
   const root = svg('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': '体重の推移' });
   for (const v of [lo + 0.3, hi - 0.3]) {
@@ -225,7 +226,7 @@ export async function renderDashboard(setHeader) {
     const s = days.filter((d) => dayTotal(d) > 0).reduce((a, d) => a + mealTotal(d.meals[t.id]), 0);
     return { ...t, value: recorded ? Math.round(s / recorded) : 0 };
   });
-  const mealMax = Math.max(1, ...mealAvg.map((m) => m.value));
+  const mealSum = mealAvg.reduce((a, m) => a + m.value, 0);
 
   // State lives here, not in the URL, so ask the router to redraw the current route.
   const rerender = () => window.dispatchEvent(new HashChangeEvent('hashchange'));
@@ -279,7 +280,7 @@ export async function renderDashboard(setHeader) {
     selectedKey = b ? b.key : null;
     if (!b) {
       readout.replaceChildren(h('span', { class: 'muted' },
-        unit === 'week' ? '記録日の週平均・タップで詳細' : '棒をタップで詳細'));
+        `目標 ${fmt(goal)}kcal・${unit === 'week' ? '記録日の週平均・' : ''}棒をタップで詳細`));
       return;
     }
     const when = b.from === b.to ? `${shortDate(b.from)}(${WEEKDAYS[fromKey(b.from).getDay()]})` : `${shortDate(b.from)}〜${shortDate(b.to)} 平均`;
@@ -307,21 +308,23 @@ export async function renderDashboard(setHeader) {
   const pfcDays = days.map((d) => sumPfc(dayItems(d))).filter((t) => t.has);
   const avgOf = (arr, k) => Math.round(arr.reduce((a, t) => a + t[k], 0) / arr.length);
   const waterDays = days.filter((d) => d.water);
+  const extra = (label, value) => h('span', { class: 'extra' }, h('small', {}, label), h('b', {}, value));
   const extras = [
-    pfcDays.length ? `PFC平均(入力分) P${avgOf(pfcDays, 'p')}・F${avgOf(pfcDays, 'f')}・C${avgOf(pfcDays, 'c')}g` : null,
-    waterDays.length ? `水分平均 ${fmtLiters(waterDays.reduce((a, d) => a + d.water, 0) / waterDays.length)}` : null,
+    pfcDays.length ? extra('PFC', `${avgOf(pfcDays, 'p')}/${avgOf(pfcDays, 'f')}/${avgOf(pfcDays, 'c')}g`) : null,
+    waterDays.length ? extra('水分', fmtLiters(waterDays.reduce((a, d) => a + d.water, 0) / waterDays.length)) : null,
   ].filter(Boolean);
   const chartTabs = h('div', { class: 'segment segment-mini chart-tabs', role: 'tablist' },
     [['kcal', 'カロリー'], ['weight', '体重']].map(([k, l]) => h('button', {
       role: 'tab', 'aria-selected': String(state.chart === k), onclick: () => { state.chart = k; rerender(); },
     }, l)));
 
-  const meals = h('div', { class: 'meal-bars' },
-    mealAvg.map((m) => h('div', { class: 'meal-bar-row' },
-      h('span', { class: 'meal-bar-label' }, m.label),
-      h('span', { class: 'meal-bar-value' }, fmt(m.value)),
-      h('span', { class: 'meal-bar-track' },
-        h('span', { class: `meal-bar-fill dot-${m.id}`, style: `width:${(m.value / mealMax) * 100}%` })))));
+  // Share of each meal as one stacked bar, with the values underneath.
+  const meals = h('div', { class: 'meal-split' },
+    h('div', { class: 'meal-stack', role: 'img', 'aria-label': mealAvg.map((m) => `${m.label}${fmt(m.value)}kcal`).join('、') },
+      mealSum ? mealAvg.filter((m) => m.value > 0).map((m) => h('span', { class: `dot-${m.id}`, style: `flex:${m.value}` })) : null),
+    h('div', { class: 'meal-values' },
+      mealAvg.map((m) => h('span', { class: 'meal-value' },
+        h('small', {}, h('i', { class: `dot dot-${m.id}` }), m.label), h('b', {}, fmt(m.value))))));
 
   const view = h('div', { class: 'view dash-view' },
     seg, periodRow, kpis, balanceNote,
@@ -332,12 +335,13 @@ export async function renderDashboard(setHeader) {
           ? h('span', { class: 'chart-legend' },
             h('i', { class: 'key key-wline' }), '実測', tdee ? [h('i', { class: 'key key-west' }), '推定'] : null)
           : h('span', { class: 'chart-legend' },
-            h('i', { class: 'key key-bar' }), '目標内', h('i', { class: 'key key-over' }), '超過',
-            h('i', { class: 'key key-goal' }), `目標${fmt(goal)}`)),
+            h('i', { class: 'key key-over' }), '超過',
+            h('i', { class: 'key key-goal' }), '目標')),
       readout, chartBox),
     h('section', { class: 'card meal-card' },
-      h('h2', {}, '食事別の平均 (kcal/日)'), meals,
-      extras.length ? h('p', { class: 'meal-extras' }, extras.join('　')) : null));
+      h('h2', {}, '食事別の平均', h('small', { class: 'unit' }, 'kcal/日')),
+      meals,
+      extras.length ? h('div', { class: 'meal-extras' }, h('small', {}, '平均'), extras) : null));
 
   // Redraw whenever the chart area changes size (rotation, the balance note opening, etc.).
   view.onMount = () => {
