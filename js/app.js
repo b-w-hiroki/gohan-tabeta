@@ -3,44 +3,15 @@ import {
   getAllPhotos, clearAll, dayTotal, mealTotal, hasContent,
 } from './db.js';
 import { FOOD_PRESETS } from './foods.js';
+import {
+  WEEKDAYS, pad, toKey, fromKey, todayKey, addDays, uid, fmt, h, getGoal, setGoal,
+} from './util.js';
+import { renderDashboard } from './dashboard.js';
 
 const $app = document.getElementById('app');
 const $title = document.getElementById('title');
 const $back = document.getElementById('back');
-const $settingsBtn = document.getElementById('settings-btn');
-const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
-
-// ---------- helpers ----------
-const pad = (n) => String(n).padStart(2, '0');
-const toKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const fromKey = (k) => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
-const todayKey = () => toKey(new Date());
-const addDays = (key, n) => { const d = fromKey(key); d.setDate(d.getDate() + n); return toKey(d); };
-const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-const fmt = (n) => Number(n).toLocaleString('ja-JP');
-
-function h(tag, attrs = {}, ...children) {
-  const el = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) {
-    if (v == null || v === false) continue;
-    if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
-    else if (k === 'class') el.className = v;
-    else if (k === 'style') el.style.cssText = v;
-    else el.setAttribute(k, v === true ? '' : v);
-  }
-  for (const c of children.flat()) {
-    if (c == null || c === false) continue;
-    el.append(c instanceof Node ? c : document.createTextNode(String(c)));
-  }
-  return el;
-}
-
-function getGoal() {
-  try { return Number(localStorage.getItem('goalKcal')) || 2000; } catch { return 2000; }
-}
-function setGoal(v) {
-  try { localStorage.setItem('goalKcal', String(v)); } catch { /* storage unavailable */ }
-}
+const $nav = document.getElementById('bottom-nav');
 
 // Object URLs created for the current view; revoked on every navigation.
 let objectUrls = [];
@@ -81,6 +52,7 @@ function parseRoute() {
   const [name, arg] = hash.split('/');
   if (name === 'day' && /^\d{4}-\d{2}-\d{2}$/.test(arg || '')) return { name: 'day', date: arg };
   if (name === 'settings') return { name: 'settings' };
+  if (name === 'stats') return { name: 'stats' };
   if (name === 'month' && /^\d{4}-\d{2}$/.test(arg || '')) return { name: 'month', month: arg };
   return { name: 'month', month: todayKey().slice(0, 7) };
 }
@@ -88,11 +60,15 @@ function parseRoute() {
 async function render() {
   revokeUrls();
   const route = parseRoute();
-  $back.hidden = route.name === 'month';
-  $settingsBtn.hidden = route.name === 'settings';
+  $back.hidden = route.name !== 'day';
+  $nav.hidden = route.name === 'day';
+  for (const a of $nav.querySelectorAll('a')) {
+    a.setAttribute('aria-current', a.dataset.route === route.name ? 'page' : 'false');
+  }
   let view;
   if (route.name === 'day') view = await renderDay(route.date);
   else if (route.name === 'settings') view = renderSettings();
+  else if (route.name === 'stats') view = await renderDashboard($title);
   else view = await renderMonth(route.month);
   $app.replaceChildren(view);
   view.onMount?.();
@@ -103,7 +79,6 @@ $back.addEventListener('click', () => {
   if (route.name === 'day') location.hash = `#/month/${route.date.slice(0, 7)}`;
   else location.hash = '#/';
 });
-$settingsBtn.addEventListener('click', () => { location.hash = '#/settings'; });
 window.addEventListener('hashchange', render);
 
 // ---------- month (calendar) view ----------
