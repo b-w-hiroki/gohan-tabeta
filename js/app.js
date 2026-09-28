@@ -90,15 +90,12 @@ async function render() {
   const route = parseRoute();
   $back.hidden = route.name === 'month';
   $settingsBtn.hidden = route.name === 'settings';
-  const scrollY = window.scrollY;
-  const sameView = render.last === location.hash;
-  render.last = location.hash;
   let view;
   if (route.name === 'day') view = await renderDay(route.date);
   else if (route.name === 'settings') view = renderSettings();
   else view = await renderMonth(route.month);
   $app.replaceChildren(view);
-  window.scrollTo(0, sameView ? scrollY : 0);
+  view.onMount?.();
 }
 
 $back.addEventListener('click', () => {
@@ -123,7 +120,8 @@ async function renderMonth(month) {
   const prevMonth = toKey(new Date(y, m - 2, 1)).slice(0, 7);
   const nextMonth = toKey(new Date(y, m, 1)).slice(0, 7);
 
-  const grid = h('div', { class: 'cal-grid' },
+  const weeks = Math.ceil((first.getDay() + last.getDate()) / 7);
+  const grid = h('div', { class: 'cal-grid', style: `grid-template-rows: auto repeat(${weeks}, 1fr)` },
     WEEKDAYS.map((w, i) => h('div', { class: `cal-wd wd-${i}` }, w)));
   for (let i = 0; i < first.getDay(); i++) grid.append(h('div', { class: 'cal-cell empty' }));
 
@@ -163,6 +161,18 @@ async function renderMonth(month) {
 }
 
 // ---------- day view ----------
+// Selected meal tab, kept across re-renders of the same day.
+let dayTab = { date: null, index: 0 };
+
+function defaultMealIndex(date) {
+  if (date !== todayKey()) return 0;
+  const hr = new Date().getHours();
+  if (hr < 10) return 0;
+  if (hr < 15) return 1;
+  if (hr < 21) return 2;
+  return 3;
+}
+
 async function renderDay(date) {
   const day = await getDay(date);
   const d = fromKey(date);
@@ -171,25 +181,57 @@ async function renderDay(date) {
   const total = dayTotal(day);
   const pct = Math.min(100, Math.round((total / goal) * 100));
   const remain = goal - total;
+  if (dayTab.date !== date) dayTab = { date, index: defaultMealIndex(date) };
 
   const save = async () => { await putDay(day); await render(); };
+
+  const tabs = MEAL_TYPES.map((t, i) => {
+    const sub = mealTotal(day.meals[t.id]);
+    return h('button', {
+      class: `tab tab-${t.id}`, role: 'tab',
+      onclick: () => selectTab(i, true),
+    },
+    h('span', { class: 'tab-label' }, t.icon, ' ', t.label),
+    h('span', { class: 'tab-kcal' }, sub ? fmt(sub) : hasContent(day.meals[t.id]) ? '✓' : '—'));
+  });
+
+  const panels = h('div', { class: 'panels' });
+  for (const type of MEAL_TYPES) panels.append(await renderMealCard(day, type, save));
+
+  function selectTab(i, scroll) {
+    dayTab.index = i;
+    tabs.forEach((t, j) => t.setAttribute('aria-selected', String(i === j)));
+    if (scroll) panels.scrollTo({ left: i * panels.clientWidth, behavior: 'smooth' });
+  }
+  // Swiping the panels updates the active tab.
+  let scrollTimer;
+  panels.addEventListener('scroll', () => {
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      const i = Math.round(panels.scrollLeft / panels.clientWidth);
+      if (i !== dayTab.index) selectTab(i, false);
+    }, 60);
+  });
 
   const view = h('div', { class: 'view day-view' },
     h('div', { class: 'day-nav' },
       h('button', { class: 'icon-btn', 'aria-label': '前の日', onclick: () => { location.hash = `#/day/${addDays(date, -1)}`; } }, '‹'),
       h('div', { class: 'day-summary' },
-        h('div', { class: 'day-total' }, h('strong', {}, fmt(total)), ` / ${fmt(goal)} kcal`),
-        h('div', { class: 'bar' }, h('div', { class: `bar-fill${remain < 0 ? ' over' : ''}`, style: `width:${pct}%` })),
-        h('small', { class: remain < 0 ? 'over-text' : '' },
-          remain < 0 ? `${fmt(-remain)}kcal オーバー` : `あと ${fmt(remain)}kcal`)),
-      h('button', { class: 'icon-btn', 'aria-label': '次の日', onclick: () => { location.hash = `#/day/${addDays(date, 1)}`; } }, '›')));
+        h('div', { class: 'day-total' }, h('strong', {}, fmt(total)), ` / ${fmt(goal)} kcal`,
+          h('small', { class: remain < 0 ? 'over-text' : '' },
+            remain < 0 ? `${fmt(-remain)} オーバー` : `あと ${fmt(remain)}`),
+          date !== todayKey()
+            ? h('button', { class: 'today-chip', onclick: () => { location.hash = `#/day/${todayKey()}`; } }, '今日へ')
+            : null),
+        h('div', { class: 'bar' }, h('div', { class: `bar-fill${remain < 0 ? ' over' : ''}`, style: `width:${pct}%` }))),
+      h('button', { class: 'icon-btn', 'aria-label': '次の日', onclick: () => { location.hash = `#/day/${addDays(date, 1)}`; } }, '›')),
+    h('div', { class: 'tabs', role: 'tablist' }, tabs),
+    panels);
 
-  for (const type of MEAL_TYPES) {
-    view.append(await renderMealCard(day, type, save));
-  }
-  if (date !== todayKey()) {
-    view.append(h('button', { class: 'link-btn', onclick: () => { location.hash = `#/day/${todayKey()}`; } }, '今日へ移動'));
-  }
+  view.onMount = () => {
+    selectTab(dayTab.index, false);
+    panels.scrollLeft = dayTab.index * panels.clientWidth;
+  };
   return view;
 }
 
@@ -239,7 +281,7 @@ async function renderMealCard(day, type, save) {
 
   let memoTimer;
   const memo = h('textarea', {
-    class: 'memo', rows: 1, placeholder: 'メモ（場所・一緒に食べた人など）',
+    class: 'memo', rows: 1, placeholder: 'メモ',
     oninput: (e) => {
       meal.memo = e.target.value;
       clearTimeout(memoTimer);
@@ -249,11 +291,11 @@ async function renderMealCard(day, type, save) {
   });
   memo.value = meal.memo;
 
-  return h('section', { class: `card meal meal-${type.id}` },
+  return h('section', { class: `card meal meal-${type.id}`, role: 'tabpanel' },
     h('header', { class: 'meal-head' },
       h('h2', {}, h('span', { class: 'meal-icon' }, type.icon), type.label),
       h('span', { class: 'meal-kcal' }, subtotal ? `${fmt(subtotal)} kcal` : '')),
-    items,
+    h('div', { class: 'items-wrap' }, items, meal.items.length ? null : h('p', { class: 'empty' }, 'まだ記録がありません')),
     h('button', { class: 'add-btn', onclick: () => openItemSheet(type, null, async (next) => {
       if (next) { meal.items.push(next); await save(); }
     }) }, '＋ 食べたものを追加'),
@@ -394,16 +436,16 @@ function renderSettings() {
         if (v < 500 || v > 9999) { toast('500〜9999で入力してください'); return; }
         setGoal(v); toast('保存しました');
       } }, goal, h('span', {}, 'kcal'), h('button', { class: 'primary', type: 'submit' }, '保存')),
-      h('p', { class: 'hint' }, '目安: 成人女性 1,400〜2,000 / 成人男性 2,000〜2,600 kcal')),
+      h('p', { class: 'hint' }, '目安: 女性 1,400〜2,000 / 男性 2,000〜2,600')),
     h('section', { class: 'card' },
       h('h2', {}, 'データのバックアップ'),
-      h('p', { class: 'hint' }, 'データはこの端末のブラウザ内にのみ保存されます。機種変更やブラウザのデータ削除に備えて、定期的にエクスポートしてください。'),
+      h('p', { class: 'hint' }, 'データはこの端末内のみに保存。機種変更に備えて定期的にエクスポートしてください。'),
       h('div', { class: 'row' },
         h('button', { class: 'secondary', onclick: exportData }, 'エクスポート'),
         h('label', { class: 'button secondary' }, fileInput, 'インポート'))),
     h('section', { class: 'card' },
       h('h2', {}, 'ホーム画面に追加'),
-      h('p', { class: 'hint' }, 'iPhone: Safariの共有ボタン →「ホーム画面に追加」。Android: Chromeのメニュー →「ホーム画面に追加」。アプリのように全画面で使えます。')));
+      h('p', { class: 'hint' }, 'iPhone: 共有 →「ホーム画面に追加」／Android: メニュー →「ホーム画面に追加」')));
 }
 
 // ---------- boot ----------
