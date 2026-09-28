@@ -1,13 +1,13 @@
 import {
   MEAL_TYPES, getDay, putDay, getDaysInRange, getAllDays, putPhoto, getPhoto, deletePhoto,
-  getAllPhotos, clearAll, dayTotal, mealTotal, hasContent, exerciseTotal, useStore, localStore,
+  getAllPhotos, clearAll, dayTotal, mealTotal, hasContent, exerciseTotal, useStore, localStore, dayItems,
 } from './db.js';
 import { FOOD_PRESETS, EXERCISE_PRESETS } from './foods.js';
 import {
-  WEEKDAYS, pad, toKey, fromKey, todayKey, addDays, uid, fmt, h, getGoal, setGoal,
+  WEEKDAYS, pad, toKey, fromKey, todayKey, addDays, uid, fmt, h, getGoal, setGoal, shortDate,
   getProfile, setProfile, isProfileComplete, calcBmr, calcTdee, exerciseKcal, ACTIVITY_LEVELS,
   icon, iconSvg, parseKcal, getShortcutName, setShortcutName, DEFAULT_SHORTCUT,
-  setSettingsHook, applySettings, currentSettings,
+  setSettingsHook, applySettings, currentSettings, getMyFoods, setMyFoods, round1, sumPfc, fmtLiters,
 } from './util.js';
 import { renderDashboard } from './dashboard.js';
 import {
@@ -234,7 +234,11 @@ async function renderDay(date) {
   }, h('span', { class: 'tab-label' }, t.label), h('span', { class: 'tab-kcal' }, t.value)));
 
   const panels = h('div', { class: 'panels' });
-  for (const type of MEAL_TYPES) panels.append(await renderMealCard(day, type, save));
+  // Most recent earlier record of each meal (last 30 days), offered as "copy previous" on empty meals.
+  const past = (await getDaysInRange(addDays(date, -30), addDays(date, -1)).catch(() => []))
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+  const lastMeal = (id) => past.find((d) => d.meals?.[id]?.items?.length);
+  for (const type of MEAL_TYPES) panels.append(await renderMealCard(day, type, save, lastMeal(type.id)));
   panels.append(renderExerciseCard(day, save));
 
   function selectTab(i, scroll) {
@@ -259,7 +263,7 @@ async function renderDay(date) {
         h('span', { class: `remain${remain < 0 ? ' over-text' : ''}` },
           remain < 0 ? `${fmt(-remain)} オーバー` : `あと ${fmt(remain)}`)),
       h('div', { class: 'bar' }, h('div', { class: `bar-fill${remain < 0 ? ' over' : ''}`, style: `width:${pct}%` })),
-      burned ? h('div', { class: 'day-burn' }, `運動 -${fmt(burned)} kcal`) : null),
+      renderDayChips(day, burned, save)),
     h('div', { class: 'tabs', role: 'tablist' }, tabs),
     panels);
 
@@ -274,7 +278,67 @@ function actionButton(iconName, label, attrs = {}) {
   return h('button', { class: 'action-btn', ...attrs }, icon(iconName, 18), label);
 }
 
-async function renderMealCard(day, type, save) {
+// Exercise / weight / water / PFC at a glance; weight and water are tappable.
+function renderDayChips(day, burned, save) {
+  const pfc = sumPfc(dayItems(day));
+  const chip = (label, value, onclick, cls = '') => h(onclick ? 'button' : 'span', { class: `day-chip ${cls}`, onclick, type: onclick ? 'button' : null },
+    h('small', {}, label), h('b', {}, value));
+  return h('div', { class: 'day-chips' },
+    chip('体重', day.weight ? `${day.weight}kg` : '記録', () => openWeightSheet(day, save), day.weight ? '' : 'empty'),
+    chip('水分', day.water ? fmtLiters(day.water) : '記録', () => openWaterSheet(day, save), day.water ? '' : 'empty'),
+    burned ? chip('運動', `-${fmt(burned)}`) : null,
+    pfc.has ? chip('PFC', `${Math.round(pfc.p)}/${Math.round(pfc.f)}/${Math.round(pfc.c)}g`) : null);
+}
+
+function openWeightSheet(day, save) {
+  const input = h('input', { type: 'number', inputmode: 'decimal', step: 0.1, min: 20, max: 300, placeholder: '例: 55.2', 'aria-label': '体重(kg)' });
+  input.value = day.weight || getProfile()?.weight || '';
+  let close;
+  const form = h('form', { class: 'item-form', onsubmit: async (e) => {
+    e.preventDefault();
+    const v = round1(input.value);
+    if (!v || v < 20 || v > 300) { toast('体重を正しく入力してください'); return; }
+    day.weight = v;
+    // Today's weight also updates the profile so BMR and exercise estimates stay current.
+    const prof = getProfile();
+    if (day.date === todayKey() && prof) setProfile({ ...prof, weight: v });
+    close(); await save();
+  } },
+  h('h3', {}, '体重を記録'),
+  h('label', {}, '体重 (kg)', input),
+  h('p', { class: 'hint' }, '朝起きてトイレの後など、同じ条件で測ると変化がわかりやすくなります。今日の体重は基本情報にも反映されます。'),
+  h('div', { class: 'sheet-actions' },
+    day.weight ? h('button', { type: 'button', class: 'danger', onclick: async () => { delete day.weight; close(); await save(); } }, '削除') : null,
+    h('button', { type: 'button', class: 'secondary', onclick: () => close() }, 'キャンセル'),
+    h('button', { type: 'submit', class: 'primary' }, '保存')));
+  close = openSheet(form);
+  setTimeout(() => { input.focus(); input.select(); }, 50);
+}
+
+function openWaterSheet(day, save) {
+  let ml = Number(day.water) || 0;
+  const value = h('strong', { class: 'water-value' });
+  const draw = () => { value.textContent = `${fmt(ml)} ml`; };
+  draw();
+  const add = (n) => () => { ml = Math.max(0, ml + n); draw(); };
+  let close;
+  const form = h('form', { class: 'item-form', onsubmit: async (e) => {
+    e.preventDefault();
+    if (ml) day.water = ml; else delete day.water;
+    close(); await save();
+  } },
+  h('h3', {}, '水分を記録'),
+  h('div', { class: 'water-now' }, value, h('small', {}, '目安 1日 1.5〜2L（食事以外）')),
+  h('div', { class: 'water-btns' },
+    ...[[150, 'コップ'], [350, '缶'], [500, 'ペット']].map(([n, l]) => h('button', { type: 'button', class: 'chip', onclick: add(n) }, `＋${n}ml`, h('small', {}, l))),
+    h('button', { type: 'button', class: 'chip', onclick: add(-150) }, '−150ml')),
+  h('div', { class: 'sheet-actions' },
+    h('button', { type: 'button', class: 'secondary', onclick: () => close() }, 'キャンセル'),
+    h('button', { type: 'submit', class: 'primary' }, '保存')));
+  close = openSheet(form);
+}
+
+async function renderMealCard(day, type, save, previous) {
   const meal = day.meals[type.id];
   const subtotal = mealTotal(meal);
 
@@ -284,7 +348,7 @@ async function renderMealCard(day, type, save) {
         if (next) meal.items[idx] = next; else meal.items.splice(idx, 1);
         await save();
       }) },
-      h('span', { class: 'item-name' }, it.name || '(無題)'),
+      h('span', { class: 'item-name' }, it.name || '(無題)', pfcText(it) ? h('small', { class: 'item-pfc' }, pfcText(it)) : null),
       h('span', { class: 'item-kcal' }, `${fmt(it.kcal)} kcal`),
       icon('chevron-right', 16)))));
 
@@ -336,7 +400,15 @@ async function renderMealCard(day, type, save) {
       h('h2', {}, type.label),
       h('span', { class: 'meal-kcal' }, subtotal ? `${fmt(subtotal)} kcal` : '')),
     h('div', { class: 'items-wrap' }, items,
-      empty ? h('p', { class: 'empty' }, `${type.label}はまだ記録がありません`) : null),
+      empty ? h('div', { class: 'empty' },
+        h('p', {}, `${type.label}はまだ記録がありません`),
+        previous ? h('button', { class: 'copy-btn', onclick: async () => {
+          const src = previous.meals[type.id].items;
+          meal.items.push(...src.map((it) => ({ ...it })));
+          toast(`${shortDate(previous.date)}の${type.label}をコピーしました`);
+          await save();
+        } }, `${shortDate(previous.date)}の${type.label}をコピー`,
+        h('small', {}, `${previous.meals[type.id].items.length}品・${fmt(mealTotal(previous.meals[type.id]))}kcal`)) : null) : null),
     thumbs.length ? h('div', { class: 'photos' }, thumbs) : null,
     h('div', { class: 'actions' },
       actionButton('plus', '食事を追加', { class: 'action-btn primary-soft', onclick: () => openItemSheet(type, null, async (next) => {
@@ -441,10 +513,40 @@ function openSheet(content) {
   return close;
 }
 
+// Frequently eaten foods from the last 60 days (most frequent first), for quick re-entry.
+async function recentFoods() {
+  const days = await getDaysInRange(addDays(todayKey(), -60), todayKey()).catch(() => []);
+  const byName = new Map();
+  for (const d of days.sort((x, y) => (x.date < y.date ? -1 : 1))) {
+    for (const it of dayItems(d)) {
+      if (!it.name) continue;
+      const prev = byName.get(it.name);
+      byName.set(it.name, { ...it, count: (prev?.count || 0) + 1 });
+    }
+  }
+  return [...byName.values()].sort((x, y) => y.count - x.count).slice(0, 16);
+}
+
+const pfcOf = (it) => ({ p: it.p, f: it.f, c: it.c });
+const pfcText = (it) => (it.p != null || it.f != null || it.c != null
+  ? `P${round1(it.p)} F${round1(it.f)} C${round1(it.c)}` : '');
+
 function openItemSheet(type, item, onDone) {
   const name = h('input', { type: 'text', placeholder: '例: 焼き魚定食', enterkeyhint: 'next', autocomplete: 'off' });
   const kcal = h('input', { type: 'number', inputmode: 'numeric', placeholder: '0', min: 0, max: 9999, enterkeyhint: 'done' });
-  if (item) { name.value = item.name; kcal.value = item.kcal; }
+  const pfcInput = (label) => h('input', { type: 'number', inputmode: 'decimal', step: 0.1, min: 0, max: 999, placeholder: '-', 'aria-label': label });
+  const p = pfcInput('たんぱく質(g)'); const f = pfcInput('脂質(g)'); const c = pfcInput('炭水化物(g)');
+  const saveMine = h('input', { type: 'checkbox' });
+  if (item) {
+    name.value = item.name; kcal.value = item.kcal;
+    if (item.p != null) p.value = item.p;
+    if (item.f != null) f.value = item.f;
+    if (item.c != null) c.value = item.c;
+  }
+  const pfcDetails = h('details', { class: 'pfc-details', open: item && (item.p != null || item.f != null || item.c != null) },
+    h('summary', {}, 'PFC（たんぱく質・脂質・炭水化物）を入力'),
+    h('div', { class: 'pfc-row' },
+      h('label', {}, 'P たんぱく質(g)', p), h('label', {}, 'F 脂質(g)', f), h('label', {}, 'C 炭水化物(g)', c)));
 
   let close;
   const submit = async (e) => {
@@ -452,26 +554,59 @@ function openItemSheet(type, item, onDone) {
     const n = name.value.trim();
     const k = Math.max(0, Math.round(Number(kcal.value) || 0));
     if (!n && !k) { name.focus(); return; }
+    const next = { name: n || '食事', kcal: k };
+    for (const [key, el] of [['p', p], ['f', f], ['c', c]]) {
+      if (el.value !== '') next[key] = round1(el.value);
+    }
+    if (saveMine.checked) {
+      const mine = getMyFoods().filter((m) => m.name !== next.name);
+      setMyFoods([next, ...mine].slice(0, 50));
+      toast('マイメニューに保存しました');
+    }
     close();
-    await onDone({ name: n || '食事', kcal: k });
+    await onDone(next);
   };
 
-  const presets = h('div', { class: 'presets' },
-    FOOD_PRESETS.map((p) => h('button', {
-      type: 'button', class: 'chip',
-      onclick: () => {
-        // Tapping a preset adds its calories to what's already entered, so sets can be built up.
-        name.value = name.value.trim() ? `${name.value.trim()}・${p.name}` : p.name;
-        kcal.value = (Number(kcal.value) || 0) + p.kcal;
-      },
-    }, p.name, h('small', {}, p.kcal))));
+  // Tapping a food adds it to what's already entered, so a set meal can be built up.
+  const addFood = (fd) => {
+    name.value = name.value.trim() ? `${name.value.trim()}・${fd.name}` : fd.name;
+    kcal.value = (Number(kcal.value) || 0) + (Number(fd.kcal) || 0);
+    for (const [key, el] of [['p', p], ['f', f], ['c', c]]) {
+      if (fd[key] != null) el.value = round1((Number(el.value) || 0) + Number(fd[key]));
+    }
+  };
+  const chip = (fd, extra) => h('button', { type: 'button', class: `chip${extra ? ` ${extra}` : ''}`, onclick: () => addFood(fd) },
+    fd.name, h('small', {}, fd.kcal));
+
+  const list = h('div', { class: 'presets' });
+  let tab = 'mine';
+  const tabs = h('div', { class: 'segment segment-mini', role: 'tablist' });
+  const drawTabs = () => {
+    tabs.replaceChildren(...[['mine', 'マイメニュー・履歴'], ['std', '定番']].map(([id, label]) => h('button', {
+      type: 'button', role: 'tab', 'aria-selected': String(tab === id), onclick: () => { tab = id; drawTabs(); drawList(); },
+    }, label)));
+  };
+  const drawList = async () => {
+    if (tab === 'std') { list.replaceChildren(...FOOD_PRESETS.map((fd) => chip(fd))); return; }
+    const mine = getMyFoods();
+    list.replaceChildren(...mine.map((fd) => chip(fd, 'chip-mine')));
+    const recent = (await recentFoods()).filter((r) => !mine.some((m) => m.name === r.name));
+    if (tab !== 'mine') return;
+    list.append(...recent.map((fd) => chip(fd)));
+    if (!list.children.length) {
+      list.append(h('p', { class: 'hint' }, 'まだありません。下の「マイメニューに保存」にチェックして保存すると、ここに並びます。'));
+    }
+  };
+  drawTabs(); drawList();
 
   const form = h('form', { class: 'item-form', onsubmit: submit },
     h('h3', {}, `${type.label}を${item ? '編集' : '追加'}`),
     h('label', {}, '料理名', name),
     h('label', {}, 'カロリー (kcal)', kcal),
-    h('p', { class: 'hint' }, 'よく食べるもの（タップで加算）'),
-    presets,
+    pfcDetails,
+    tabs,
+    list,
+    h('label', { class: 'check-row' }, saveMine, 'この内容をマイメニューに保存'),
     h('div', { class: 'sheet-actions' },
       item ? h('button', { type: 'button', class: 'danger', onclick: async () => {
         if (!confirm('この項目を削除しますか？')) return;
@@ -573,7 +708,8 @@ async function exportData() {
   const days = await getAllDays();
   const photos = await getAllPhotos();
   const data = {
-    app: 'gohan-tabeta', version: 1, exportedAt: new Date().toISOString(), goalKcal: getGoal(), profile: getProfile(), days,
+    app: 'gohan-tabeta', version: 1, exportedAt: new Date().toISOString(), goalKcal: getGoal(), profile: getProfile(),
+    settings: currentSettings(), days,
     photos: await Promise.all(photos.map(async (p) => ({ id: p.id, date: p.date, data: await blobToDataUrl(p.blob) }))),
   };
   const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
@@ -594,6 +730,7 @@ async function importData(file) {
   for (const d of data.days) await putDay(d);
   if (data.goalKcal) setGoal(data.goalKcal);
   if (data.profile) setProfile(data.profile);
+  if (data.settings?.myFoods) setMyFoods(data.settings.myFoods);
   return true;
 }
 
@@ -601,7 +738,7 @@ let settingsTab = 'profile';
 
 function renderSettings() {
   setHeader({ title: '設定' });
-  const tabs = [['profile', '基本情報'], ['goal', '目標'], ['link', '連携'], ['data', 'データ']];
+  const tabs = [['profile', '基本情報'], ['goal', '目標'], ['menu', 'メニュー'], ['link', '連携'], ['data', 'データ']];
   const seg = h('div', { class: 'segment', role: 'tablist' },
     tabs.map(([id, label]) => h('button', {
       role: 'tab', 'aria-selected': String(settingsTab === id),
@@ -609,7 +746,8 @@ function renderSettings() {
     }, label)));
   const body = settingsTab === 'profile' ? renderProfileForm()
     : settingsTab === 'goal' ? renderGoalForm()
-      : settingsTab === 'link' ? renderLinkPanel() : renderDataPanel();
+      : settingsTab === 'menu' ? renderMenuPanel()
+        : settingsTab === 'link' ? renderLinkPanel() : renderDataPanel();
   return h('div', { class: 'view settings-view' }, seg, body);
 }
 
@@ -698,6 +836,23 @@ function renderLinkPanel() {
       setShortcutName(name.value.trim() || DEFAULT_SHORTCUT); toast('保存しました'); render();
     } }, name, h('button', { class: 'secondary', type: 'submit' }, '名前を保存')),
     h('p', { class: 'hint note' }, '使い方：運動タブの「Watch」→ 実行後にこのアプリへ戻り「貼り付けて記録」。同じ日は上書き'));
+}
+
+function renderMenuPanel() {
+  const foods = getMyFoods();
+  const list = h('ul', { class: 'items menu-list' },
+    foods.map((fd, i) => h('li', {},
+      h('div', { class: 'item-main' },
+        h('span', { class: 'item-name' }, fd.name, pfcText(fd) ? h('small', { class: 'item-pfc' }, pfcText(fd)) : null),
+        h('span', { class: 'item-kcal' }, `${fmt(fd.kcal)} kcal`),
+        h('button', { class: 'icon-btn small', 'aria-label': `${fd.name}を削除`, onclick: () => {
+          if (!confirm(`「${fd.name}」をマイメニューから削除しますか？`)) return;
+          setMyFoods(foods.filter((_, j) => j !== i)); render();
+        } }, icon('trash', 18))))));
+  return h('section', { class: 'card menu-panel' },
+    h('h2', {}, 'マイメニュー'),
+    h('p', { class: 'hint' }, '食事の追加画面で「マイメニューに保存」にチェックすると登録されます。最近よく食べたものも自動で候補に出ます。'),
+    foods.length ? h('div', { class: 'menu-scroll' }, list) : h('div', { class: 'empty' }, h('p', {}, 'まだ登録がありません')));
 }
 
 function renderDataPanel() {

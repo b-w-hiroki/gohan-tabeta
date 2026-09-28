@@ -44,6 +44,7 @@ export function applySettings(s) {
     if (s.goalKcal) localStorage.setItem('goalKcal', String(s.goalKcal));
     if (s.profile) localStorage.setItem('profile', JSON.stringify(s.profile));
     if (s.shortcutName) localStorage.setItem('shortcutName', s.shortcutName);
+    if (Array.isArray(s.myFoods)) localStorage.setItem('myFoods', JSON.stringify(s.myFoods));
   } catch { /* storage unavailable */ }
 }
 export function currentSettings() {
@@ -51,8 +52,33 @@ export function currentSettings() {
   const p = getProfile();
   if (p) out.profile = p;
   try { const n = localStorage.getItem('shortcutName'); if (n) out.shortcutName = n; } catch { /* ignore */ }
+  const foods = getMyFoods();
+  if (foods.length) out.myFoods = foods;
   return out;
 }
+
+// "My menu": the user's own saved foods, synced like other settings.
+export function getMyFoods() {
+  try { return JSON.parse(localStorage.getItem('myFoods')) || []; } catch { return []; }
+}
+export function setMyFoods(list) {
+  try { localStorage.setItem('myFoods', JSON.stringify(list)); } catch { /* storage unavailable */ }
+  settingsHook?.({ myFoods: list });
+}
+
+// ---------- nutrition helpers ----------
+export const round1 = (n) => Math.round((Number(n) || 0) * 10) / 10;
+export function sumPfc(items) {
+  const t = { p: 0, f: 0, c: 0, has: false };
+  for (const it of items) {
+    for (const k of ['p', 'f', 'c']) {
+      if (it[k] != null && it[k] !== '') { t[k] += Number(it[k]) || 0; t.has = true; }
+    }
+  }
+  t.p = round1(t.p); t.f = round1(t.f); t.c = round1(t.c);
+  return t;
+}
+export const fmtLiters = (ml) => `${round1((Number(ml) || 0) / 1000)}L`;
 
 // ---------- profile & energy estimates ----------
 export const KCAL_PER_KG = 7200; // Commonly used approximation for 1kg of body fat.

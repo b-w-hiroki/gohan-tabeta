@@ -518,3 +518,67 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   .auth-card input[type="email"], .auth-card input[type="password"], .google-btn, .auth-card .primary { height: 44px; min-height: 44px; }
   .auth-links .text-btn { font-size: 12px; }
 }
+
+/* ==========================================================================
+   Weight / water / PFC / my menu
+   ========================================================================== */
+.day-chips { display: flex; gap: 6px; margin-top: 6px; overflow-x: auto; scrollbar-width: none; }
+.day-chips::-webkit-scrollbar { display: none; }
+.day-chip {
+  flex: none; display: inline-flex; align-items: baseline; gap: 4px; min-height: 32px; padding: 4px 10px;
+  border-radius: 999px; background: var(--surface); border: 1px solid var(--border); font-size: 13px; color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.day-chip small { color: var(--muted); font-size: 11px; }
+.day-chip.empty b { color: var(--accent-ink); font-weight: 700; }
+button.day-chip:active { background: var(--surface-2); }
+
+.water-now { text-align: center; }
+.water-value { display: block; font-size: 32px; font-family: var(--font-brand); font-variant-numeric: tabular-nums; }
+.water-now small { color: var(--muted); font-size: 12px; }
+.water-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.water-btns .chip { min-height: 48px; font-weight: 700; }
+
+.pfc-details { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 0 10px; }
+.pfc-details summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--accent-ink); padding: 10px 0; }
+.pfc-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding-bottom: 10px; }
+.pfc-row label { font-size: 11px; }
+.item-pfc { display: block; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.check-row { display: flex !important; align-items: center; gap: 8px; min-height: 40px; font-size: 14px !important; color: var(--text) !important; font-weight: 400 !important; }
+.check-row input { width: 20px; height: 20px; accent-color: var(--accent); }
+.segment-mini button { min-height: 32px; font-size: 13px; }
+.chip-mine { border-color: var(--accent); background: var(--accent-weak); }
+
+.empty { flex-direction: column; gap: 10px; }
+.empty p { margin: 0; }
+.copy-btn {
+  display: flex; flex-direction: column; align-items: center; padding: 8px 16px; border-radius: var(--r-sm);
+  border: 1.5px dashed var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 14px;
+}
+.copy-btn small { color: var(--muted); font-weight: 400; font-size: 12px; }
+.copy-btn:active { background: var(--accent-weak); }
+
+.menu-panel { display: flex; flex-direction: column; }
+.menu-scroll { max-height: 52dvh; overflow-y: auto; }
+.menu-list .item-main { cursor: default; }
+.icon-btn.small { width: 36px; height: 36px; color: var(--muted); }
+
+.chart-tabs { width: 170px; }
+.key-wline { width: 12px; height: 0; border-radius: 0; border-top: 2.5px solid var(--accent); }
+.key-west { width: 12px; height: 0; border-radius: 0; border-top: 2px dashed var(--muted); }
+.chart-box .w-line { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; }
+.chart-box .w-est { fill: none; stroke: var(--muted); stroke-width: 2; stroke-dasharray: 5 4; }
+.chart-box .w-dot { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
+.chart-empty { margin: 0; height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--muted); font-size: 13px; padding: 0 16px; }
+.meal-extras { margin: 8px 0 0; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+@media (max-height: 700px) {
+  .day-chip { min-height: 28px; padding: 2px 8px; }
+  .meal-extras { margin-top: 4px; }
+}
+
+/* Settings has five tabs: keep them on one line. */
+.settings-view > .segment button { font-size: 13px; padding: 0 2px; white-space: nowrap; }
+@media (max-height: 700px) {
+  .link-panel { gap: 6px; }
+  .link-panel .steps { gap: 4px; font-size: 13px; }
+}
