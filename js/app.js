@@ -6,7 +6,7 @@ import { FOOD_PRESETS, EXERCISE_PRESETS } from './foods.js';
 import {
   WEEKDAYS, pad, toKey, fromKey, todayKey, addDays, uid, fmt, h, getGoal, setGoal,
   getProfile, setProfile, isProfileComplete, calcBmr, calcTdee, exerciseKcal, ACTIVITY_LEVELS,
-  icon, iconSvg, parseKcal,
+  icon, iconSvg, parseKcal, getShortcutName, setShortcutName, DEFAULT_SHORTCUT,
 } from './util.js';
 import { renderDashboard } from './dashboard.js';
 
@@ -23,6 +23,7 @@ function blobUrl(blob) { const u = URL.createObjectURL(blob); objectUrls.push(u)
 function revokeUrls() { objectUrls.forEach((u) => URL.revokeObjectURL(u)); objectUrls = []; }
 
 function toast(msg) {
+  document.querySelectorAll('.toast').forEach((t) => t.remove());
   const el = h('div', { class: 'toast' }, msg);
   document.body.append(el);
   setTimeout(() => el.remove(), 2200);
@@ -115,6 +116,10 @@ async function render() {
   view.onMount?.();
 }
 window.addEventListener('hashchange', render);
+// Coming back from the Shortcuts app: redraw so the paste prompt appears.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && getWatchPending()) render();
+});
 
 // ---------- month (calendar) view ----------
 async function renderMonth(month) {
@@ -207,6 +212,7 @@ async function renderDay(date) {
   const pct = Math.min(100, Math.round((total / goal) * 100));
   const remain = goal - total;
   if (dayTab.date !== date) dayTab = { date, index: defaultMealIndex(date) };
+  if (getWatchPending() === date) dayTab.index = MEAL_TYPES.length;
 
   const save = async () => { await putDay(day); await render(); };
 
@@ -346,23 +352,52 @@ function renderExerciseCard(day, save) {
       h('span', { class: 'item-kcal' }, `-${fmt(ex.kcal)} kcal`),
       icon('chevron-right', 16)))));
 
+  const pending = getWatchPending() === day.date;
+  const paste = async () => { if (await pasteWatchKcal(day.date)) render(); };
+
   return h('section', { class: 'card meal meal-exercise', role: 'tabpanel', 'aria-label': '運動' },
     h('header', { class: 'meal-head' },
       h('h2', {}, '運動'),
       h('span', { class: 'meal-kcal' }, total ? `-${fmt(total)} kcal` : '')),
     h('div', { class: 'items-wrap' }, items,
       day.exercises.length ? null : h('p', { class: 'empty' }, '運動はまだ記録がありません')),
-    h('div', { class: 'actions' },
-      actionButton('plus', '運動を追加', { class: 'action-btn primary-soft', onclick: () => openExerciseSheet(null, async (next) => {
-        if (next) { day.exercises.push(next); await save(); }
-      }) }),
-      actionButton('watch', 'Watch', { 'aria-label': 'Apple Watchの値を貼り付け', onclick: async () => {
-        if (await pasteWatchKcal(day.date)) render();
-      } })),
-    h('p', { class: 'hint' }, 'Watch：ショートカットでコピーした値を貼り付け'));
+    pending
+      ? h('div', { class: 'watch-banner', role: 'status' },
+        h('p', {}, icon('watch', 18), 'ショートカットでコピーした値を記録します'),
+        h('div', { class: 'actions' },
+          h('button', { class: 'primary watch-paste', onclick: paste }, '貼り付けて記録'),
+          h('button', { class: 'action-btn', onclick: () => { clearWatchPending(); render(); } }, 'やめる')),
+        h('small', {}, '「ペースト」と表示されたらタップ'))
+      : h('div', { class: 'actions' },
+        actionButton('plus', '運動を追加', { class: 'action-btn primary-soft', onclick: () => openExerciseSheet(null, async (next) => {
+          if (next) { day.exercises.push(next); await save(); }
+        }) }),
+        actionButton('watch', 'Watch', { 'aria-label': 'ショートカットでApple Watchの値を取り込む', onclick: () => runWatchShortcut(day.date) })),
+    pending ? null : h('p', { class: 'hint' }, 'Watch：ショートカット実行後に戻って貼り付け　',
+      h('button', { class: 'text-btn', onclick: paste }, 'コピー済みの値を貼る')));
 }
 
 // ---------- Apple Watch (via iOS Shortcuts) ----------
+// The app launches the Shortcut, the Shortcut copies the value, and on return the app offers a paste button.
+const PENDING_KEY = 'watchPending';
+const PENDING_TTL = 15 * 60 * 1000;
+
+function getWatchPending() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PENDING_KEY));
+    return p && Date.now() - p.at < PENDING_TTL ? p.date : null;
+  } catch { return null; }
+}
+function clearWatchPending() {
+  try { localStorage.removeItem(PENDING_KEY); } catch { /* storage unavailable */ }
+}
+function runWatchShortcut(date) {
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify({ date, at: Date.now() })); } catch { /* storage unavailable */ }
+  location.href = `shortcuts://run-shortcut?name=${encodeURIComponent(getShortcutName())}`;
+  // If the Shortcuts app did not open (e.g. not on iOS), still show the paste prompt.
+  setTimeout(() => { if (document.visibilityState === 'visible') render(); }, 1500);
+}
+
 // One Watch entry per day: re-importing later in the day replaces it instead of double counting.
 async function saveWatchKcal(date, kcal) {
   const day = await getDay(date);
@@ -383,9 +418,9 @@ async function pasteWatchKcal(date) {
     kcal = parseKcal(typed);
   }
   if (!kcal) { toast('数値が見つかりませんでした'); return false; }
-  if (!confirm(`アクティブカロリー ${fmt(kcal)}kcal を記録しますか？\n（この日のApple Watch記録は置き換えます）`)) return false;
   await saveWatchKcal(date, kcal);
-  toast('Apple Watchの値を記録しました');
+  clearWatchPending();
+  toast(`Apple Watch ${fmt(kcal)}kcal を記録しました`);
   return true;
 }
 
@@ -640,35 +675,23 @@ function renderGoalForm() {
       : h('p', { class: 'hint' }, '基本情報を入力すると、減量ペース別の目安を表示します'));
 }
 
-let linkMode = 'paste';
-
 function renderLinkPanel() {
-  const importUrl = `${location.origin}${location.pathname}#/import?kcal=`;
+  const name = h('input', { type: 'text', value: getShortcutName(), 'aria-label': 'ショートカット名', autocomplete: 'off' });
   const step = (n, ...body) => h('li', {}, h('span', { class: 'step-no' }, n), h('span', {}, ...body));
   const b = (t) => h('b', {}, t);
-  const common = [
-    step(1, 'ショートカットAppで新規作成し ', b('ヘルスケアサンプルを検索'), '（アクティブエネルギー・今日）'),
-    step(2, b('統計を計算'), '（合計）→ ', b('数値を丸める')),
-  ];
-  const body = linkMode === 'paste'
-    ? [h('ol', { class: 'steps' }, ...common,
-      step(3, b('クリップボードにコピー'), 'を追加して実行'),
-      step(4, 'アプリの ', b('運動 → Watch'), ' で貼り付け')),
-    h('p', { class: 'hint note' }, 'ホーム画面のアプリはこちらを使用。同じ日の再取り込みは上書き。活動量は「座り仕事が中心」推奨')]
-    : [h('ol', { class: 'steps' }, ...common,
-      step(3, b('URLを開く'), 'に下のURL＋丸めた数値を指定')),
-    h('button', { class: 'url-copy', onclick: async () => {
-      try { await navigator.clipboard.writeText(importUrl); toast('URLをコピーしました'); } catch { prompt('URLをコピーしてください', importUrl); }
-    } }, h('code', {}, importUrl), h('small', {}, 'タップでコピー')),
-    h('p', { class: 'hint note' }, 'Safariで使う場合のみ（ホーム画面のアプリとはデータが別）。再取り込みは上書き')];
-
   return h('section', { class: 'card link-panel' },
     h('h2', {}, 'Apple Watchの消費カロリー取り込み'),
-    h('div', { class: 'segment segment-sm', role: 'tablist' },
-      [['paste', '貼り付け（推奨）'], ['url', 'URL']].map(([id, label]) => h('button', {
-        role: 'tab', 'aria-selected': String(linkMode === id), onclick: () => { linkMode = id; render(); },
-      }, label))),
-    ...body);
+    h('p', { class: 'hint' }, 'ショートカットAppで次の手順のショートカットを1回だけ作成します'),
+    h('ol', { class: 'steps' },
+      step(1, '新規作成し、名前を ', b(`「${getShortcutName()}」`), ' にする'),
+      step(2, b('ヘルスケアサンプルを検索'), '（アクティブエネルギー・開始日が今日）'),
+      step(3, b('統計を計算'), '（合計）→ ', b('数値を丸める')),
+      step(4, b('クリップボードにコピー'), ' を追加して保存')),
+    h('form', { class: 'row', onsubmit: (e) => {
+      e.preventDefault();
+      setShortcutName(name.value.trim() || DEFAULT_SHORTCUT); toast('保存しました'); render();
+    } }, name, h('button', { class: 'secondary', type: 'submit' }, '名前を保存')),
+    h('p', { class: 'hint note' }, '使い方：運動タブの「Watch」→ 実行後にこのアプリへ戻り「貼り付けて記録」。同じ日は上書き'));
 }
 
 function renderDataPanel() {

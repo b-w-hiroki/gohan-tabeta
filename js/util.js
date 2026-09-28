@@ -106,3 +106,12 @@ export function parseKcal(text) {
   const v = Math.round(Number(m[0]));
   return v > 0 && v < 10000 ? v : 0;
 }
+
+// Name of the iOS Shortcut that copies today's Apple Watch active energy.
+export const DEFAULT_SHORTCUT = 'Watch取り込み';
+export function getShortcutName() {
+  try { return localStorage.getItem('shortcutName') || DEFAULT_SHORTCUT; } catch { return DEFAULT_SHORTCUT; }
+}
+export function setShortcutName(v) {
+  try { localStorage.setItem('shortcutName', v); } catch { /* storage unavailable */ }
+}
