@@ -11,11 +11,13 @@ import {
 } from './util.js';
 import { renderDashboard } from './dashboard.js';
 import {
-  isConfigured, currentUser, cloudStore, signInGoogle, signInEmail, signUpEmail, resetPassword,
+  isConfigured, currentUser, redirectPending, initCloud, cloudStore, signInGoogle, signInEmail, signUpEmail, resetPassword,
   signOutCloud, authErrorMessage, deleteAccount,
 } from './cloud.js';
 
 const $app = document.getElementById('app');
+// Rejects if the promise has not settled in time (network calls that can hang on some browsers).
+const withTimeout = (promise, ms) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))]);
 const $title = document.getElementById('title');
 const $subtitle = document.getElementById('subtitle');
 const $left = document.getElementById('hd-left');
@@ -882,7 +884,7 @@ function renderDataPanel() {
       h('p', { class: 'hint' }, `${session.user.email || session.user.displayName || 'ログイン中'} でログイン中。記録はクラウドに保存され、他の端末でも同じ内容が見られます。`),
       h('button', { class: 'secondary', onclick: async () => {
         if (!confirm('ログアウトしますか？（記録はクラウドに残ります）')) return;
-        await signOutCloud();
+        try { await withTimeout(signOutCloud(), 8000); } catch { /* still leave this device logged out */ }
         setAuthMode(null);
         location.reload();
       } }, 'ログアウト'),
@@ -963,7 +965,7 @@ async function offerMigration(cloud) {
 }
 
 // ---------- login screen ----------
-function renderLogin() {
+function renderLogin(message = '') {
   document.body.classList.add('auth-screen');
   let mode = 'login';
   const configured = isConfigured();
@@ -1017,6 +1019,7 @@ function renderLogin() {
   configured ? null : h('p', { class: 'auth-notice' }, 'クラウド保存は準備中です。今は「ログインせずに使う」で利用できます。'));
   if (!configured) for (const el of [email, password, submit]) el.disabled = true;
   setMode('login');
+  if (message) { error.textContent = message; error.hidden = false; }
 
   $app.replaceChildren(h('div', { class: 'auth' },
     h('div', { class: 'auth-hero' },
@@ -1045,19 +1048,25 @@ function googleMark() {
 
 // ---------- boot ----------
 async function boot() {
-  let user = null;
-  if (isConfigured() && getAuthMode() !== 'local') {
-    try { user = await currentUser(); } catch { /* offline or SDK unavailable: fall through */ }
+  const mode = getAuthMode();
+  if (!isConfigured() || mode === 'local') { render(); return; }
+  if (mode !== 'cloud' && !redirectPending()) {
+    // Not logged in on this device: show the login screen now and load the SDK in the background.
+    renderLogin();
+    initCloud().catch(() => {});
+    return;
   }
+  // Logged in before (or back from a Google redirect): restore the session, but never wait forever.
+  $app.replaceChildren(h('div', { class: 'boot-loading' }, h('span', { class: 'spinner' }), '読み込み中…'));
+  let user = null;
+  try { user = await withTimeout(currentUser(), 10000); } catch { /* slow network or blocked storage */ }
   if (user) {
     try { await startCloud(user); } catch { toast('クラウドに接続できませんでした'); }
     render();
-  } else if (getAuthMode() === 'local' || !isConfigured()) {
-    // Until cloud sync is configured there is nothing to log in to: open the app directly.
-    render();
-  } else {
-    renderLogin();
+    return;
   }
+  setAuthMode(null);
+  renderLogin(mode === 'cloud' ? 'ログイン状態を確認できませんでした。もう一度ログインしてください' : '');
 }
 boot();
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {

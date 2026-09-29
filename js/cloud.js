@@ -27,11 +27,24 @@ export async function initCloud() {
   return fb;
 }
 
+// A Google redirect login is in flight (set just before leaving the page).
+const REDIRECT_KEY = 'authRedirectPending';
+export function redirectPending() {
+  try { return !!localStorage.getItem(REDIRECT_KEY); } catch { return false; }
+}
+function setRedirectPending(on) {
+  try { if (on) localStorage.setItem(REDIRECT_KEY, '1'); else localStorage.removeItem(REDIRECT_KEY); } catch { /* ignore */ }
+}
+
 // Resolves once with the signed-in user (or null).
 export async function currentUser() {
   const c = await initCloud();
   if (!c) return null;
-  await c.a.getRedirectResult(c.auth).catch(() => null); // finish a Google redirect login, if any
+  // Only finish a redirect login when one was started: on some browsers this call is slow.
+  if (redirectPending()) {
+    setRedirectPending(false);
+    await c.a.getRedirectResult(c.auth).catch(() => null);
+  }
   await c.auth.authStateReady();
   return c.auth.currentUser;
 }
@@ -61,6 +74,7 @@ export async function signInGoogle() {
   } catch (e) {
     // Popups can be blocked (e.g. some home-screen apps): fall back to a full-page redirect.
     if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment') {
+      setRedirectPending(true);
       await a.signInWithRedirect(auth, provider);
       return null;
     }
