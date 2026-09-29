@@ -536,7 +536,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   font-variant-numeric: tabular-nums;
 }
 .day-chip small { color: var(--muted); font-size: 11px; }
-.day-chip.empty b { color: var(--accent-ink); font-weight: 700; }
+.day-chip.is-empty b { color: var(--accent-ink); font-weight: 700; }
 .day-chip b { overflow: hidden; text-overflow: ellipsis; }
 .day-chip.none b { color: var(--muted); font-weight: 400; }
 button.day-chip { cursor: pointer; }
@@ -603,3 +603,17 @@ button.day-chip:active { background: var(--surface-2); }
 .boot-loading { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--muted); font-size: 14px; }
 .spinner { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--accent); animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+body.booting .topbar, body.booting .bottom-nav { visibility: hidden; }
+.boot-loading img { border-radius: 14px; margin-bottom: 4px; }
+
+/* Login / sign-up tabs */
+.auth-tabs button { min-height: 38px; font-size: 14px; }
+.auth-links { justify-content: flex-end; }
+.auth-links:not(:has(:not([hidden]))) { display: none; }
+
+/* Account card in Settings > Data */
+.account-id { margin: 0 0 4px; display: flex; flex-direction: column; }
+.account-id small { color: var(--muted); font-size: 11px; }
+.account-id b { font-size: 15px; overflow-wrap: anywhere; }
+.account-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.account-actions .danger { background: none; border: none; padding: 0 4px; min-height: 40px; font-size: 13px; text-decoration: underline; }
