@@ -598,3 +598,8 @@ button.day-chip:active { background: var(--surface-2); }
 }
 
 .month-summary.empty-hint { justify-content: center; color: var(--muted); font-size: 13px; }
+
+/* Startup while the login session is restored */
+.boot-loading { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--muted); font-size: 14px; }
+.spinner { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--accent); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
