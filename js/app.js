@@ -953,9 +953,13 @@ async function offerMigration(cloud) {
   }
   toast('記録をアカウントに保存しています…');
   for (const d of localDays) await cloud.putDay(d);
-  for (const p of await localStore.getAllPhotos()) await cloud.putPhoto(p);
+  // One unreadable photo must not abort the login; the local copy stays on this device.
+  let failed = 0;
+  for (const p of await localStore.getAllPhotos()) {
+    try { await cloud.putPhoto(p); } catch { failed++; }
+  }
   try { localStorage.setItem(migratedKey, 'done'); } catch { /* ignore */ }
-  toast(`${localDays.length}日分の記録を保存しました`);
+  toast(`${localDays.length}日分の記録を保存しました${failed ? `（写真${failed}枚は保存できませんでした）` : ''}`);
 }
 
 // ---------- login screen ----------
