@@ -16,4 +16,21 @@ export default {
       await page.context().close();
     }
   },
+
+  async 'with cloud config the first visit shows the login screen; guest mode persists'({ browser, base }) {
+    for (const device of PHONES) {
+      const page = await openPage(browser, base, { device, local: false, cloud: true });
+      await page.go('', '.auth');
+      assertEq(await page.isVisible('.bottom-nav'), false, 'nav hidden on login');
+      assertEq(await page.isEnabled('.google-btn'), true, 'Google login enabled');
+      assertEq(await page.isVisible('.auth-notice'), false, 'no "not ready" notice');
+      await page.click('.auth-guest .secondary');
+      await page.waitForSelector('.cal-grid');
+      await page.reload(); await page.waitForSelector('.cal-grid');
+      await page.go('#/settings', '.segment');
+      await page.click('.settings-view > .segment button:has-text("データ")');
+      assertEq(await page.isVisible('text=ログインしてクラウドに保存'), true, 'offers login from settings');
+      await page.context().close();
+    }
+  },
 };

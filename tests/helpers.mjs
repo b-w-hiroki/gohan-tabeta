@@ -8,7 +8,8 @@ export async function launch() {
 }
 
 // A page on the app. local=true starts in "use without login" mode.
-export async function openPage(browser, base, { device = 'iPhone 13', local = true, scheme = 'light', permissions } = {}) {
+// cloud=false serves a null Firebase config so tests never depend on the real project.
+export async function openPage(browser, base, { device = 'iPhone 13', local = true, scheme = 'light', permissions, cloud = false } = {}) {
   const ctx = await browser.newContext({ ...devices[device], colorScheme: scheme });
   if (permissions) await ctx.grantPermissions(permissions, { origin: base });
   if (local) {
@@ -19,6 +20,11 @@ export async function openPage(browser, base, { device = 'iPhone 13', local = tr
   const page = await ctx.newPage();
   const errors = [];
   await page.route((u) => u.hostname !== '127.0.0.1', (r) => r.abort());
+  if (!cloud) {
+    await page.route('**/js/firebase-config.js', (r) => r.fulfill({
+      contentType: 'text/javascript', body: 'export const FIREBASE_CONFIG = null;',
+    }));
+  }
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error' && !/ERR_FAILED|Failed to load resource/.test(m.text())) errors.push(m.text()); });
   page.on('dialog', (d) => d.accept());
