@@ -29,6 +29,11 @@ export default {
           await page.click(`.tab-${tab}`); await page.waitForTimeout(350);
           await assertFits(page, `${label} day ${tab}`);
         }
+        // A day without records: the weight/water chips stay one line high.
+        const empty = await page.evaluate(async () => (await import('./js/util.js')).addDays((await import('./js/util.js')).todayKey(), 5));
+        await page.go(`#/day/${empty}`, '.day-chips');
+        const tall = await page.$$eval('.day-chip', (els) => els.map((e) => e.offsetHeight).filter((hgt) => hgt > 36));
+        if (tall.length) throw new Error(`${label} empty-day chips too tall: ${tall}`);
         await page.go('#/stats', '.chart-box');
         for (const mode of ['週', '月', '期間']) {
           await page.click(`.dash-view > .segment button:has-text("${mode}")`); await page.waitForTimeout(300);

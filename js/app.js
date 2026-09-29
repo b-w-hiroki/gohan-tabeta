@@ -95,7 +95,8 @@ function parseRoute() {
 }
 
 async function render() {
-  if (document.body.classList.contains('auth-screen')) return; // login screen owns the page
+  // The login screen owns the page; while a session is being restored, nothing else may render.
+  if (document.body.classList.contains('auth-screen') || document.body.classList.contains('booting')) return;
   revokeUrls();
   const route = parseRoute();
   if (route.name === 'import') {
@@ -293,8 +294,8 @@ function renderDayChips(day, save) {
   const chip = (label, value, onclick, cls = '') => h(onclick ? 'button' : 'span', { class: `day-chip ${cls}`, onclick, type: onclick ? 'button' : null },
     h('small', {}, label), h('b', {}, value));
   return h('div', { class: 'day-chips' },
-    chip('体重', day.weight ? `${day.weight}kg` : '記録', () => openWeightSheet(day, save), day.weight ? '' : 'empty'),
-    chip('水分', day.water ? fmtLiters(day.water) : '記録', () => openWaterSheet(day, save), day.water ? '' : 'empty'),
+    chip('体重', day.weight ? `${day.weight}kg` : '記録', () => openWeightSheet(day, save), day.weight ? '' : 'is-empty'),
+    chip('水分', day.water ? fmtLiters(day.water) : '記録', () => openWaterSheet(day, save), day.water ? '' : 'is-empty'),
     // Exercise already shows on its own tab, so the third slot is the PFC total.
     chip('PFC', pfc.has ? `${Math.round(pfc.p)}/${Math.round(pfc.f)}/${Math.round(pfc.c)}g` : '—', null, pfc.has ? 'pfc' : 'pfc none'));
 }
@@ -879,9 +880,11 @@ function renderDataPanel() {
     },
   });
   const account = session.user
-    ? h('section', { class: 'card' },
+    ? h('section', { class: 'card account-card' },
       h('h2', {}, 'アカウント'),
-      h('p', { class: 'hint' }, `${session.user.email || session.user.displayName || 'ログイン中'} でログイン中。記録はクラウドに保存され、他の端末でも同じ内容が見られます。`),
+      h('p', { class: 'account-id' }, h('small', {}, 'ログイン中'), h('b', {}, session.user.email || session.user.displayName || '')),
+      h('p', { class: 'hint' }, '記録はクラウドに保存され、他の端末でも同じ内容が見られます。'),
+      h('div', { class: 'account-actions' },
       h('button', { class: 'secondary', onclick: async () => {
         if (!confirm('ログアウトしますか？（記録はクラウドに残ります）')) return;
         try { await withTimeout(signOutCloud(), 8000); } catch { /* still leave this device logged out */ }
@@ -897,7 +900,7 @@ function renderDataPanel() {
           alert('アカウントを削除しました');
           location.reload();
         } catch (err) { toast(authErrorMessage(err)); }
-      } }, 'アカウントを削除'))
+      } }, 'アカウントを削除')))
     : h('section', { class: 'card' },
       h('h2', {}, 'アカウント'),
       h('p', { class: 'hint' }, 'ログインせずに利用中。記録はこの端末だけに保存されています。'),
@@ -973,8 +976,15 @@ function renderLogin(message = '') {
   const password = h('input', { type: 'password', placeholder: 'パスワード（6文字以上）', autocomplete: 'current-password', 'aria-label': 'パスワード' });
   const error = h('p', { class: 'auth-error', role: 'alert', hidden: true });
   const submit = h('button', { class: 'primary block', type: 'submit' }, 'ログイン');
-  const toggle = h('button', { type: 'button', class: 'text-btn' });
   const note = h('p', { class: 'auth-note' });
+  const forgot = h('button', { type: 'button', class: 'text-btn', onclick: async () => {
+    if (!email.value.trim()) { fail('パスワード再設定のメールを送るため、メールアドレスを入力してください'); return; }
+    try { await resetPassword(email.value.trim()); toast('再設定メールを送りました'); } catch (err) { fail(err); }
+  } }, 'パスワードを忘れた');
+  const tabs = h('div', { class: 'segment auth-tabs', role: 'tablist' },
+    [['login', 'ログイン'], ['signup', '新規登録']].map(([m, l]) => h('button', {
+      type: 'button', role: 'tab', 'data-mode': m, onclick: () => setMode(m),
+    }, l)));
 
   const busy = (on) => { for (const b of form.querySelectorAll('button')) b.disabled = on; };
   const fail = (e) => { error.textContent = typeof e === 'string' ? e : authErrorMessage(e); error.hidden = false; busy(false); };
@@ -989,32 +999,32 @@ function renderLogin(message = '') {
     mode = m;
     submit.textContent = m === 'login' ? 'ログイン' : '新規登録';
     password.autocomplete = m === 'login' ? 'current-password' : 'new-password';
-    toggle.textContent = m === 'login' ? 'はじめての方は新規登録' : 'アカウントをお持ちの方はログイン';
+    for (const t of tabs.children) t.setAttribute('aria-selected', String(t.dataset.mode === m));
+    forgot.hidden = m !== 'login';
     note.textContent = m === 'login' ? '' : '登録すると、利用規約とプライバシーポリシーに同意したものとみなします。';
     error.hidden = true;
   };
-  toggle.addEventListener('click', () => setMode(mode === 'login' ? 'signup' : 'login'));
 
-  const form = h('form', { class: 'auth-card', onsubmit: async (e) => {
+  const form = h('form', { class: 'auth-card', novalidate: true, onsubmit: async (e) => {
     e.preventDefault();
     if (!configured) return;
+    // Our own messages instead of the browser's (often English) validation bubbles.
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.value.trim())) { fail('メールアドレスを正しく入力してください'); email.focus(); return; }
+    if (password.value.length < 6) { fail('パスワードは6文字以上で入力してください'); password.focus(); return; }
     busy(true); error.hidden = true;
     try {
       await done(mode === 'login' ? await signInEmail(email.value.trim(), password.value)
         : await signUpEmail(email.value.trim(), password.value));
     } catch (err) { fail(err); }
   } },
+  tabs,
   h('button', { type: 'button', class: 'google-btn', disabled: !configured, onclick: async () => {
     busy(true); error.hidden = true;
     try { await done(await signInGoogle()); } catch (err) { fail(err); }
-  } }, googleMark(), 'Googleでログイン'),
-  h('div', { class: 'auth-divider' }, h('span', {}, 'または')),
-  email, password, submit, error,
-  h('div', { class: 'auth-links' }, toggle,
-    h('button', { type: 'button', class: 'text-btn', onclick: async () => {
-      if (!email.value.trim()) { fail('パスワード再設定のメールを送るため、メールアドレスを入力してください'); return; }
-      try { await resetPassword(email.value.trim()); toast('再設定メールを送りました'); } catch (err) { fail(err); }
-    } }, 'パスワードを忘れた')),
+  } }, googleMark(), 'Googleで続ける'),
+  h('div', { class: 'auth-divider' }, h('span', {}, 'またはメールアドレスで')),
+  email, password, error, submit,
+  h('div', { class: 'auth-links' }, forgot),
   note,
   configured ? null : h('p', { class: 'auth-notice' }, 'クラウド保存は準備中です。今は「ログインせずに使う」で利用できます。'));
   if (!configured) for (const el of [email, password, submit]) el.disabled = true;
@@ -1057,9 +1067,12 @@ async function boot() {
     return;
   }
   // Logged in before (or back from a Google redirect): restore the session, but never wait forever.
-  $app.replaceChildren(h('div', { class: 'boot-loading' }, h('span', { class: 'spinner' }), '読み込み中…'));
+  document.body.classList.add('booting');
+  $app.replaceChildren(h('div', { class: 'boot-loading' },
+    h('img', { src: 'icons/icon.svg', alt: '', width: 56, height: 56 }), h('span', { class: 'spinner' }), '記録を読み込んでいます…'));
   let user = null;
   try { user = await withTimeout(currentUser(), 10000); } catch { /* slow network or blocked storage */ }
+  document.body.classList.remove('booting');
   if (user) {
     try { await startCloud(user); } catch { toast('クラウドに接続できませんでした'); }
     render();
