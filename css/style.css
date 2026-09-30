@@ -628,3 +628,12 @@ body.booting .topbar, body.booting .bottom-nav { visibility: hidden; }
 }
 .check-btn:active { background: var(--surface-2); }
 .check-btn[aria-pressed="true"] { border: 1.5px solid var(--accent); background: var(--accent-weak); color: var(--accent-ink); }
+
+/* 広告枠（i-mobile）。広告が実際に描画されるまで .has-ad が付かず、枠ごと隠れる */
+.ad-slot { display: none; margin: 20px auto 8px; text-align: center; max-width: 100%; overflow: hidden; }
+.ad-slot.has-ad { display: block; }
+.ad-slot .ad-label { font-size: 10px; color: var(--muted); letter-spacing: .12em; margin-bottom: 6px; font-weight: 600; }
+.ad-slot .ad-content { display: flex; justify-content: center; align-items: center; min-height: 50px; }
+/* 1画面に収める画面の中では余白を詰める */
+.view > .ad-slot { margin: 4px auto 0; }
+.view > .ad-slot .ad-label { margin-bottom: 2px; }

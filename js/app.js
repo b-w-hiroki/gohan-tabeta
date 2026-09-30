@@ -123,6 +123,7 @@ async function render() {
   else view = await renderMonth(route.month);
   $app.replaceChildren(view);
   view.onMount?.();
+  window.BirdmanAds?.mount($app);
 }
 window.addEventListener('hashchange', render);
 // Coming back from the Shortcuts app: redraw so the paste prompt appears.
@@ -1061,9 +1062,12 @@ function renderLogin(message = '') {
         render();
       } }, 'ログインせずに使う'),
       h('small', {}, 'ログインしない場合、記録はこの端末だけに保存されます。ログインすると機種変更や複数の端末でも記録を引き継げます。')),
+    // 広告枠（i-mobile のスポット設定後に表示。未設定なら何も出ない）
+    window.BirdmanAds ? window.BirdmanAds.slot('login') : null,
     h('p', { class: 'auth-footer' },
       h('a', { href: './' }, 'ごはん食べたについて'), ' ・ ', h('a', { href: './terms.html' }, '利用規約'),
       ' ・ ', h('a', { href: './privacy.html' }, 'プライバシーポリシー'))));
+  window.BirdmanAds?.mount($app);
 }
 
 function googleMark() {

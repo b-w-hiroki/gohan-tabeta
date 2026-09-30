@@ -129,6 +129,10 @@
 
     .final { text-align: center; background: var(--surface-2); border-radius: 28px; padding: 44px 20px; }
     .final .cta { justify-content: center; }
+    .ad-slot { display: none; margin: 40px auto 0; text-align: center; max-width: 100%; overflow: hidden; }
+    .ad-slot.has-ad { display: block; }
+    .ad-slot .ad-label { font-size: 10px; color: var(--muted); letter-spacing: .12em; margin-bottom: 6px; font-weight: 600; }
+    .ad-slot .ad-content { display: flex; justify-content: center; align-items: center; min-height: 50px; }
     footer { padding: 32px 0 calc(40px + env(safe-area-inset-bottom)); color: var(--muted); font-size: 13px; text-align: center; }
     footer nav { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px; }
     footer a { color: var(--muted); }
@@ -249,7 +253,7 @@
     <section>
       <div class="wrap">
         <h2>よくある質問</h2>
-        <details><summary>料金はかかりますか？</summary><p>無料で使えます。</p></details>
+        <details><summary>料金はかかりますか？</summary><p>無料で使えます。運営費は、アプリ内やこのページに表示する広告でまかなっています。</p></details>
         <details><summary>ログインしないと使えませんか？</summary><p>ログインせずに使えます。その場合、記録はお使いの端末の中だけに保存されます。機種変更や複数端末で使いたい場合はログインしてください。</p></details>
         <details><summary>記録はどこに保存されますか？</summary><p>ログインすると、Google の Firebase（クラウド）にあなたのアカウント専用で保存されます。ほかの人が見ることはできません。詳しくは<a href="./privacy.html">プライバシーポリシー</a>をご覧ください。</p></details>
         <details><summary>Android でも使えますか？</summary><p>使えます。Chrome で開いて「ホーム画面に追加」してください。Apple Watch 連携のみ iPhone 限定です。</p></details>
@@ -264,6 +268,10 @@
         <div class="cta"><a class="btn btn-primary" href="./app.html">無料ではじめる</a></div>
       </div>
     </div>
+    <!-- 広告枠（i-mobile「トップページ」スポット。js/ads.js に設定後に表示。未設定なら何も出ない） -->
+    <div class="wrap">
+      <div class="ad-slot" data-ad-spot="lp"><div class="ad-label">広告</div><div class="ad-content"></div></div>
+    </div>
   </main>
 
   <footer>
@@ -272,5 +280,6 @@
       <p>© birdman studio</p>
     </div>
   </footer>
+  <script src="js/ads.js" defer></script>
 </body>
 </html>
