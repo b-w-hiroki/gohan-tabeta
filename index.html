@@ -274,12 +274,37 @@
     </div>
   </main>
 
+  <!-- 姉妹アプリの紹介（4アプリ共通。アプリを増やしたら全LPのこのブロックを更新） -->
+  <style>
+    /* birdman studio の姉妹アプリ紹介（4アプリ共通。色は各ページの文字色を引き継ぐ） */
+    .bs-apps { max-width: 1040px; margin: 48px auto 0; padding: 0 20px; color: inherit; }
+    .bs-apps h2 { margin: 0 0 4px; font-size: 18px; line-height: 1.5; }
+    .bs-apps .bs-sub { margin: 0 0 14px; font-size: 13px; opacity: .75; }
+    .bs-apps ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    .bs-apps a { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; text-decoration: none; color: inherit;
+      border: 1px solid rgba(128, 128, 128, .28); background: rgba(128, 128, 128, .06); }
+    .bs-apps a:hover { background: rgba(128, 128, 128, .12); }
+    .bs-apps img { flex: none; width: 44px; height: 44px; border-radius: 11px; }
+    .bs-apps b { display: block; font-size: 15px; line-height: 1.4; }
+    .bs-apps small { display: block; font-size: 12px; line-height: 1.5; opacity: .75; }
+  </style>
+  <section class="bs-apps" aria-labelledby="bs-apps-title">
+    <h2 id="bs-apps-title">birdman studio のほかのアプリ</h2>
+    <p class="bs-sub">どれも無料・インストール不要で使えます。</p>
+    <ul>
+      <li><a href="https://otsukai.birdman-studio.com/?utm_source=gohan-tabeta&amp;utm_medium=referral&amp;utm_campaign=sister_apps" target="_blank" rel="noopener"><img src="https://otsukai.birdman-studio.com/icon-192.png" alt="" width="44" height="44" loading="lazy"><span><b>おうちのおつかい</b><small>家族で買い物リストを共有</small></span></a></li>
+      <li><a href="https://osanpobingo-battle.com/?utm_source=gohan-tabeta&amp;utm_medium=referral&amp;utm_campaign=sister_apps" target="_blank" rel="noopener"><img src="https://osanpobingo-battle.com/icon-192.png" alt="" width="44" height="44" loading="lazy"><span><b>おさんぽビンゴバトル</b><small>散歩で見つけたものでビンゴ</small></span></a></li>
+      <li><a href="https://osaifu.birdman-studio.com/?utm_source=gohan-tabeta&amp;utm_medium=referral&amp;utm_campaign=sister_apps" target="_blank" rel="noopener"><img src="https://osaifu.birdman-studio.com/icons/icon-192.png" alt="" width="44" height="44" loading="lazy"><span><b>おさいふ</b><small>支払い日を忘れない家計簿</small></span></a></li>
+    </ul>
+  </section>
+
   <footer>
     <div class="wrap">
-      <nav><a href="./app.html">アプリを開く</a><a href="./terms.html">利用規約</a><a href="./privacy.html">プライバシーポリシー</a></nav>
+      <nav><a href="./app.html">アプリを開く</a><a href="./terms.html">利用規約</a><a href="./privacy.html">プライバシーポリシー</a><a href="mailto:hiroki.torii4649@gmail.com">お問い合わせ</a></nav>
       <p>© 2026 birdman studio</p>
     </div>
   </footer>
   <script src="js/ads.js" defer></script>
+  <script src="js/analytics.js" async></script>
 </body>
 </html>

@@ -93,3 +93,11 @@ npx http-server -p 8080 .
 - インラインバナーのみ（オーバーレイは使わない）。SP / PC 用タグは端末で出し分け
 - 広告が実際に描画されたときだけ枠を表示（在庫切れ・ブロック時は空枠を出さない）
 - 規約・プライバシーポリシーに広告配信（i-mobile）の記載あり
+
+## アクセス解析（GA4）
+
+`js/analytics.js` の `GA_ID` に GA4 の測定ID（`G-XXXXXXXXXX`）を入れると計測が始まります。未設定の間は何も読み込みません。
+
+- GA4 の管理画面 → データストリーム →「ウェブ」で `https://gohan-tabeta.birdman-studio.com` を追加し、表示された測定IDを使う
+- page_view に `display_mode`（`standalone` = ホーム画面から起動 / `browser`）を付けて送る。GA4 の「カスタム定義」で同名のディメンションを登録すると集計できる
+- 姉妹アプリからの流入は `utm_campaign=sister_apps` で識別できる
