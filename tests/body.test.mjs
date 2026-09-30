@@ -49,6 +49,28 @@ export default {
     await page.context().close();
   },
 
+  async 'one-tap workout and gym checks toggle and show on the calendar'({ browser, base }) {
+    const page = await openPage(browser, base);
+    await page.go('#/today', '.tabs');
+    await page.click('.tab-exercise'); await page.waitForTimeout(400);
+    await page.click('.check-workout'); await page.waitForTimeout(300);
+    await page.click('.check-gym'); await page.waitForTimeout(300);
+    let day = await dayOf(page);
+    assertEq(day.workout && day.gym, true, 'both checked');
+    assertEq(await page.getAttribute('.check-gym', 'aria-pressed'), 'true', 'gym pressed');
+    assertEq((await page.textContent('.tab-exercise .tab-kcal')).trim(), '✓', 'tab shows check');
+    await page.click('.check-workout'); await page.waitForTimeout(300);
+    day = await dayOf(page);
+    assertEq(day.workout, undefined, 'workout cleared');
+    assertEq(day.gym, true, 'gym kept');
+    await page.go('#/', '.cal-grid');
+    assertEq(await page.locator('.cal-cell.today .dot-exercise').count(), 1, 'exercise dot');
+    assertEq(await page.locator('.cal-cell.today .dot-gym').count(), 1, 'gym dot');
+    assertEq((await page.textContent('.month-summary')).replace(/\s+/g, '').includes('運動1日'), true, 'month count');
+    assertNoErrors(page, 'checks');
+    await page.context().close();
+  },
+
   async 'dashboard shows the weight-loss estimate and the weight chart'({ browser, base }) {
     const page = await openPage(browser, base);
     await page.go('#/');

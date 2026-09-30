@@ -1,6 +1,6 @@
 import {
   MEAL_TYPES, getDay, putDay, getDaysInRange, getAllDays, putPhoto, getPhoto, deletePhoto,
-  getAllPhotos, clearAll, dayTotal, mealTotal, hasContent, exerciseTotal, useStore, localStore, dayItems,
+  getAllPhotos, clearAll, dayTotal, mealTotal, hasContent, exerciseTotal, didExercise, EXERCISE_CHECKS, useStore, localStore, dayItems,
 } from './db.js';
 import { FOOD_PRESETS, EXERCISE_PRESETS } from './foods.js';
 import {
@@ -155,25 +155,27 @@ async function renderMonth(month) {
     WEEKDAYS.map((w, i) => h('div', { class: `cal-wd wd-${i}` }, w)));
   for (let i = 0; i < first.getDay(); i++) grid.append(h('div', { class: 'cal-cell empty' }));
 
-  let monthTotal = 0; let recordedDays = 0;
+  let monthTotal = 0; let recordedDays = 0; let exerciseDays = 0;
   for (let d = 1; d <= last.getDate(); d++) {
     const key = `${month}-${pad(d)}`;
     const rec = byDate[key];
     const total = rec ? dayTotal(rec) : 0;
     if (total > 0) { monthTotal += total; recordedDays++; }
     const dots = rec ? MEAL_TYPES.filter((t) => hasContent(rec.meals[t.id])) : [];
-    const exercised = rec && exerciseTotal(rec) > 0;
+    const exercised = rec && didExercise(rec);
+    if (exercised) exerciseDays++;
     const over = total > goal;
     const wd = new Date(y, m - 1, d).getDay();
     grid.append(h('button', {
       class: `cal-cell${key === today ? ' today' : ''}${key > today ? ' future' : ''}`,
       onclick: () => { location.hash = key === today ? '#/today' : `#/day/${key}`; },
-      'aria-label': `${m}月${d}日 ${total ? `${total}kcal` : '記録なし'}${exercised ? ' 運動あり' : ''}`,
+      'aria-label': `${m}月${d}日 ${total ? `${total}kcal` : '記録なし'}${exercised ? ' 運動あり' : ''}${rec?.gym ? ' ジム' : ''}`,
     },
     h('span', { class: `cal-num wd-${wd}` }, d),
     h('span', { class: 'cal-dots' },
       dots.map((t) => h('i', { class: `dot dot-${t.id}` })),
-      exercised ? h('i', { class: 'dot dot-exercise' }) : null),
+      exercised ? h('i', { class: 'dot dot-exercise' }) : null,
+      rec?.gym ? h('i', { class: 'dot dot-gym' }) : null),
     total ? h('span', { class: `cal-kcal${over ? ' over' : ''}` }, fmt(total)) : null));
   }
 
@@ -183,9 +185,11 @@ async function renderMonth(month) {
     h('div', { class: 'legend' },
       MEAL_TYPES.map((t) => h('span', {}, h('i', { class: `dot dot-${t.id}` }), t.label)),
       h('span', {}, h('i', { class: 'dot dot-exercise' }), '運動'),
+      h('span', {}, h('i', { class: 'dot dot-gym' }), 'ジム'),
       h('span', { title: `目標${fmt(goal)}kcal` }, h('b', { class: 'over-sample' }, '赤字'), '=目標超')),
-    recordedDays ? h('div', { class: 'month-summary' },
+    recordedDays || exerciseDays ? h('div', { class: 'month-summary' },
       h('span', {}, '記録 ', h('strong', {}, recordedDays), '日'),
+      h('span', {}, '運動 ', h('strong', {}, exerciseDays), '日'),
       h('span', {}, '平均 ', h('strong', {}, fmt(avg)), 'kcal'),
       h('span', {}, '合計 ', h('strong', {}, fmt(monthTotal)), 'kcal'))
       : h('div', { class: 'month-summary empty-hint' }, '日付をタップして食事を記録'));
@@ -231,7 +235,7 @@ async function renderDay(date) {
       const sub = mealTotal(day.meals[t.id]);
       return { id: t.id, label: t.label, value: sub ? fmt(sub) : hasContent(day.meals[t.id]) ? '✓' : '—' };
     }),
-    { id: 'exercise', label: '運動', value: burned ? `-${fmt(burned)}` : day.exercises.length ? '✓' : '—' },
+    { id: 'exercise', label: '運動', value: burned ? `-${fmt(burned)}` : didExercise(day) ? '✓' : '—' },
   ];
   const tabs = tabDefs.map((t, i) => h('button', {
     class: `tab tab-${t.id}`, role: 'tab', onclick: () => selectTab(i, true),
@@ -440,6 +444,17 @@ function renderExerciseCard(day, save) {
       h('span', { class: 'item-kcal' }, `-${fmt(ex.kcal)} kcal`),
       icon('chevron-right', 16)))));
 
+  // One tap records "worked out" / "went to the gym"; tapping again clears it.
+  const checks = h('div', { class: 'check-btns' },
+    EXERCISE_CHECKS.map((c) => h('button', {
+      class: `check-btn check-${c.id}`, type: 'button', 'aria-pressed': String(!!day[c.id]),
+      onclick: async () => {
+        if (day[c.id]) delete day[c.id]; else day[c.id] = true;
+        toast(day[c.id] ? `「${c.label}」を記録しました` : `「${c.label}」を取り消しました`);
+        await save();
+      },
+    }, icon(day[c.id] ? 'check' : 'plus', 18), c.label)));
+
   const pending = getWatchPending() === day.date;
   const paste = async () => { if (await pasteWatchKcal(day.date)) render(); };
 
@@ -447,8 +462,10 @@ function renderExerciseCard(day, save) {
     h('header', { class: 'meal-head' },
       h('h2', {}, '運動'),
       h('span', { class: 'meal-kcal' }, total ? `-${fmt(total)} kcal` : '')),
+    checks,
     h('div', { class: 'items-wrap' }, items,
-      day.exercises.length ? null : h('p', { class: 'empty' }, '運動はまだ記録がありません')),
+      day.exercises.length ? null : h('p', { class: 'empty' }, didExercise(day)
+        ? '種目やkcalは「運動を追加」で記録' : '運動はまだ記録がありません')),
     pending
       ? h('div', { class: 'watch-banner', role: 'status' },
         h('p', {}, icon('watch', 18), 'ショートカットでコピーした値を記録します'),
