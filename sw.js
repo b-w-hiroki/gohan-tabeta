@@ -15,6 +15,7 @@ const ASSETS = [
   './js/dashboard.js',
   './js/ads.js',
   './js/analytics.js',
+  './js/sister-apps.js',
   './js/cloud.js',
   './js/firebase-config.js',
   './manifest.webmanifest',

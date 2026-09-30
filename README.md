@@ -101,3 +101,7 @@ npx http-server -p 8080 .
 - GA4 の管理画面 → データストリーム →「ウェブ」で `https://gohan-tabeta.birdman-studio.com` を追加し、表示された測定IDを使う
 - page_view に `display_mode`（`standalone` = ホーム画面から起動 / `browser`）を付けて送る。GA4 の「カスタム定義」で同名のディメンションを登録すると集計できる
 - 姉妹アプリからの流入は `utm_campaign=sister_apps` で識別できる
+
+## 姉妹アプリの導線（birdman studio 共通）
+
+LP のヘッダーの切り替えメニューとフッターのアイコンは、`js/sister-apps.js` の `APPS` から描画します。アプリを追加・変更するときは `APPS` に1行足し、同じファイルを4リポジトリ（otsukai / osanpo-bingo / gohan-tabeta / osaifu）にコピーして、各 Service Worker のキャッシュ番号を上げてください。表示中のアプリ自身は自動で一覧から外れ、件数が増えるとメニューは縦・フッターは横にスクロールします。
