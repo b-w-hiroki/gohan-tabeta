@@ -17,12 +17,18 @@
 (function () {
   // テストでは window.BIRDMAN_ADS_TEST_CONFIG で差し替える
   var IMOBILE = window.BIRDMAN_ADS_TEST_CONFIG || {
-    pid: null, // 例: 12345
+    pid: 84969,
     spots: {
-      // 例: lp: { sp: { mid: 111, asid: 222 }, pc: { mid: 333, asid: 444 } },
-      lp: null, // トップページ（LP）フッター直前
-      login: null, // ログイン画面
-      stats: null, // ダッシュボード（統計）タブの末尾
+      // 形式: { sp: { mid, asid, elementid }, pc: { mid, asid, elementid } }（タグ取得で表示される値）
+      // トップページ（LP）フッター直前
+      lp: { sp: { mid: 596787, asid: 1946462, elementid: 'im-7c35cee49c1147d19eeb12bb807a3a19' },
+        pc: { mid: 596788, asid: 1946465, elementid: 'im-4e7e06e2f1bf46d8aa0e1a9fda417867' } },
+      // ログイン画面
+      login: { sp: { mid: 596787, asid: 1946463, elementid: 'im-76d441861d4a4722ba175e7f5e5a0e69' },
+        pc: { mid: 596788, asid: 1946466, elementid: 'im-6c2256f769564e68aad0f8c4dd3ddf29' } },
+      // ダッシュボード（統計）タブの末尾
+      stats: { sp: { mid: 596787, asid: 1946464, elementid: 'im-b5fd3587580949f49df6b24d57b97cca' },
+        pc: { mid: 596788, asid: 1946467, elementid: 'im-186ad9996c944fe08ecb98fb28a83e5b' } },
     },
   };
 
@@ -44,7 +50,8 @@
     slot.dataset.adLoaded = '1';
     var content = slot.querySelector('.ad-content');
     var el = document.createElement('div');
-    el.id = 'im-' + slot.dataset.adSpot + '-' + (++seq);
+    // タグ取得で発行された elementid を使う（未指定なら生成）。同じ id が既にあれば重複を避けて生成する
+    el.id = v.elementid && !document.getElementById(v.elementid) ? v.elementid : 'im-' + slot.dataset.adSpot + '-' + (++seq);
     content.appendChild(el);
     new MutationObserver(function (_, obs) {
       if (el.children.length) { slot.classList.add('has-ad'); obs.disconnect(); }
