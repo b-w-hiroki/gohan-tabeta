@@ -92,6 +92,17 @@ export function dayTotal(day) {
   return total;
 }
 
+// One-tap checks on the exercise tab, stored as booleans on the day record.
+export const EXERCISE_CHECKS = [
+  { id: 'workout', label: '運動した' },
+  { id: 'gym', label: 'ジム行った' },
+];
+
+// Any exercise on the day: a check, or a recorded entry.
+export function didExercise(day) {
+  return EXERCISE_CHECKS.some((c) => day[c.id]) || (day.exercises || []).length > 0;
+}
+
 export function exerciseTotal(day) {
   return (day.exercises || []).reduce((sum, ex) => sum + (Number(ex.kcal) || 0), 0);
 }

@@ -9,6 +9,7 @@ const seedMonth = (db, u) => (async () => {
     d.meals.lunch.items.push({ name: '定食', kcal: 600 + (i % 5) * 40 });
     d.meals.dinner.items.push({ name: '夕食', kcal: 550 + (i % 7) * 50 });
     if (i % 2) d.exercises.push({ name: 'ウォーキング', minutes: 30, kcal: 90 });
+    if (i % 4 === 0) { d.workout = true; d.gym = true; }
     if (i % 3 === 0) d.weight = 56 - i * 0.03;
     if (i % 2 === 0) d.water = 1200 + i * 10;
     await db.putDay(d);
