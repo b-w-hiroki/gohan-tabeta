@@ -61,7 +61,9 @@
     .brand img { width: 32px; height: 32px; border-radius: 9px; }
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 24px;
       border-radius: 14px; font-weight: 700; text-decoration: none; font-size: 16px; }
-    .btn-primary { background: var(--accent); color: var(--on-accent); box-shadow: 0 6px 16px rgb(234 88 12 / .3); }
+    /* 白文字とのコントラスト 4.5:1 以上になるよう、ボタンは一段濃いオレンジ（ダークモードは明るい地に濃い文字） */
+    .btn-primary { background: var(--accent-ink); color: var(--on-accent); box-shadow: 0 6px 16px rgb(194 65 12 / .3); }
+    @media (prefers-color-scheme: dark) { .btn-primary { background: var(--accent); } }
     .btn-primary:active { transform: translateY(1px); }
     .btn-sm { min-height: 40px; padding: 0 16px; font-size: 14px; border-radius: 12px; }
     .link { font-weight: 700; }
