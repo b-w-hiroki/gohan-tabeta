@@ -1,4 +1,5 @@
 {
+  "id": "/app.html",
   "name": "ごはん食べた",
   "short_name": "ごはん食べた",
   "description": "日毎のカレンダーで朝昼晩の食事とカロリー、写真を記録するシンプルな食事管理ツール",
@@ -14,5 +15,10 @@
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "screenshots": [
+    { "src": "images/screen-day.jpg", "sizes": "780x1328", "type": "image/jpeg", "form_factor": "narrow", "label": "今日の記録：朝昼晩・間食・運動" },
+    { "src": "images/screen-calendar.jpg", "sizes": "780x1328", "type": "image/jpeg", "form_factor": "narrow", "label": "カレンダー：日ごとの合計カロリー" },
+    { "src": "images/screen-stats.jpg", "sizes": "780x1328", "type": "image/jpeg", "form_factor": "narrow", "label": "ダッシュボード：週・月の振り返り" }
   ]
 }
