@@ -79,3 +79,17 @@ npx http-server -p 8080 .
 - `js/app.js` 画面（ハッシュルーティング）・ログイン画面、`js/dashboard.js` ダッシュボード、`js/db.js` データ層（端末／クラウド切替）、`js/cloud.js` Firebase（Auth・Firestore）、`js/firebase-config.js` Firebase設定、`js/util.js` 共通処理、`js/foods.js` プリセット
 - `images/` 紹介ページ用のスクリーンショット、`firestore.rules` Firestore セキュリティルール
 - `sw.js` オフラインキャッシュ、`manifest.webmanifest` PWA設定
+
+## 広告（i-mobile）
+
+広告枠は用意済みで、スポットを設定するまでは何も表示・通信しません。i-mobile の審査通過後、`js/ads.js` の `IMOBILE` に `pid` と各スポットの SP / PC 用 `mid` / `asid` を入れると表示されます。
+
+| スポット | 場所 |
+|---|---|
+| `lp` | トップページ（LP）のフッター直前 |
+| `login` | ログイン画面のボタン群の下 |
+| `stats` | ダッシュボードの末尾（1画面に収めるため、高さ 800px 以上の画面のみ） |
+
+- インラインバナーのみ（オーバーレイは使わない）。SP / PC 用タグは端末で出し分け
+- 広告が実際に描画されたときだけ枠を表示（在庫切れ・ブロック時は空枠を出さない）
+- 規約・プライバシーポリシーに広告配信（i-mobile）の記載あり

@@ -1,5 +1,5 @@
 // Offline cache for the app shell. Bump VERSION when shipping changes to static files.
-const VERSION = 'v17';
+const VERSION = 'v18';
 const CACHE = `gohan-tabeta-${VERSION}`;
 const ASSETS = [
   './',
@@ -13,6 +13,7 @@ const ASSETS = [
   './js/foods.js',
   './js/util.js',
   './js/dashboard.js',
+  './js/ads.js',
   './js/cloud.js',
   './js/firebase-config.js',
   './manifest.webmanifest',

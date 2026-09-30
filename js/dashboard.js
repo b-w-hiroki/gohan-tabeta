@@ -341,7 +341,10 @@ export async function renderDashboard(setHeader) {
     h('section', { class: 'card meal-card' },
       h('h2', {}, '食事別の平均', h('small', { class: 'unit' }, 'kcal/日')),
       meals,
-      extras.length ? h('div', { class: 'meal-extras' }, h('small', {}, '平均'), extras) : null));
+      extras.length ? h('div', { class: 'meal-extras' }, h('small', {}, '平均'), extras) : null),
+    // 広告枠（i-mobile のスポット設定後に表示。未設定なら何も出ない）。
+    // 1画面に収める画面なので、グラフを潰さない高さのある端末だけに出す
+    window.BirdmanAds ? window.BirdmanAds.slot('stats', { minHeight: 800 }) : null);
 
   // Redraw whenever the chart area changes size (rotation, the balance note opening, etc.).
   view.onMount = () => {
