@@ -9,7 +9,9 @@
  */
 (function () {
   // テストでは window.BIRDMAN_GA_TEST_ID で差し替える
-  var GA_ID = window.BIRDMAN_GA_TEST_ID !== undefined ? window.BIRDMAN_GA_TEST_ID : null; // 例: 'G-XXXXXXXXXX'
+  var GA_ID = window.BIRDMAN_GA_TEST_ID !== undefined ? window.BIRDMAN_GA_TEST_ID : 'G-1SHZQRFM6P';
+  // 自動テスト（Playwright など）のアクセスは本番の計測に混ぜない
+  if (navigator.webdriver && window.BIRDMAN_GA_TEST_ID === undefined) return;
   if (!GA_ID) return;
 
   window.dataLayer = window.dataLayer || [];
