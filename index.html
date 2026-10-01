@@ -188,13 +188,19 @@
     .bs-foot li:first-child { margin-left: auto; } .bs-foot li:last-child { margin-right: auto; }
     .bs-foot a { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 84px; text-align: center; white-space: nowrap; text-decoration: none; color: inherit; font-size: 11px; line-height: 1.3; }
     .bs-foot img { width: 40px; height: 40px; border-radius: 10px; }
+    /* 上部の細いヘッダー: birdman studio のアプリ切替（全アプリ共通） */
+    .bs-bar { height: 40px; display: flex; align-items: center; justify-content: space-between; max-width: 1080px; margin: 0 auto;
+      padding: 0 max(12px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); }
+    .bs-bar-brand { font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+    .bs-bar .bs-sw-btn { width: 36px; height: 36px; opacity: 1; }
   </style>
 </head>
 <body>
+  <div class="bs-bar"><span class="bs-bar-brand">birdman studio</span><div class="bs-sw"><button type="button" class="bs-sw-btn" aria-label="birdman studio のほかのアプリ" aria-expanded="false" aria-controls="bs-sw-pop"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="5" cy="5" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="19" r="2"/></svg></button><div class="bs-sw-pop" id="bs-sw-pop" hidden><p>birdman studio のアプリ</p><div data-bs-list></div></div></div></div>
   <header class="site-header">
     <div class="wrap">
       <a class="brand" href="./"><img src="icons/icon.svg" alt="" width="32" height="32">ごはん食べた</a>
-      <div style="display:flex;align-items:center;gap:6px"><div class="bs-sw"><button type="button" class="bs-sw-btn" aria-label="birdman studio のほかのアプリ" aria-expanded="false" aria-controls="bs-sw-pop"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="5" cy="5" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="19" r="2"/></svg></button><div class="bs-sw-pop" id="bs-sw-pop" hidden><p>birdman studio のアプリ</p><div data-bs-list></div></div></div><a class="btn btn-primary btn-sm" href="./app.html">アプリを開く</a></div>
+      <div style="display:flex;align-items:center;gap:6px"><a class="btn btn-primary btn-sm" href="./app.html">アプリを開く</a></div>
     </div>
   </header>
 
