@@ -19,6 +19,8 @@
   --c-lunch: #10b981;
   --c-dinner: #6366f1;
   --c-snack: #ec4899;
+  --c-exercise: #0e7490;
+  --on-exercise: #ffffff;
   --shadow: 0 1px 2px rgb(60 30 0 / .06), 0 2px 8px rgb(60 30 0 / .04);
   --seg-on: #ffffff;
 
@@ -47,6 +49,8 @@
     --danger: #f87171;
     --sun: #f87171;
     --sat: #60a5fa;
+    --c-exercise: #22d3ee;
+    --on-exercise: #0b1d22;
     --shadow: none;
     --seg-on: #4a3e35;
   }
@@ -192,8 +196,6 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); ou
 .dot-lunch { background: var(--c-lunch); }
 .dot-dinner { background: var(--c-dinner); }
 .dot-snack { background: var(--c-snack); }
-/* Exercise uses shape (a ring), not a fifth hue. */
-.dot-exercise { background: transparent; box-shadow: inset 0 0 0 1.5px var(--text); }
 
 .bar { height: 8px; border-radius: 999px; background: var(--border); overflow: hidden; }
 .bar-fill { height: 100%; background: var(--accent); border-radius: inherit; transition: width .3s; }
@@ -231,6 +233,11 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); ou
   padding: 8px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums;
 }
 .month-summary strong { color: var(--text); font-size: 15px; margin: 0 1px; }
+.month-summary > span { white-space: nowrap; }
+@media (max-width: 360px) {
+  .month-summary { justify-content: space-between; gap: 2px; padding: 8px 6px; font-size: 10.5px; letter-spacing: -.02em; }
+  .month-summary strong { font-size: 13px; margin: 0; }
+}
 
 /* ==========================================================================
    Day view
@@ -618,16 +625,22 @@ body.booting .topbar, body.booting .bottom-nav { visibility: hidden; }
 .account-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .account-actions .danger { background: none; border: none; padding: 0 4px; min-height: 40px; font-size: 13px; text-decoration: underline; }
 
-/* One-tap exercise checks */
-.dot-gym { background: var(--text); }
-.check-btns { flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+/* Exercise days: the date becomes a filled badge so they stand out on the calendar. */
+.cal-cell.exercised .cal-num {
+  min-width: 24px; padding: 1px 4px; border-radius: 999px; text-align: center;
+  background: var(--c-exercise); color: var(--on-exercise) !important; font-weight: 700;
+}
+.cal-cell.exercised.future .cal-num { opacity: 1; }
+.exercise-sample { display: inline-block; width: 14px; height: 10px; border-radius: 999px; background: var(--c-exercise); }
+
+/* One-tap "worked out" check */
 .check-btn {
-  min-height: var(--tap); border-radius: var(--r-sm); display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  flex: none; min-height: var(--tap); border-radius: var(--r-sm); display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   font-size: 15px; font-weight: 700; white-space: nowrap;
   border: 1.5px dashed var(--border); color: var(--muted); background: var(--surface);
 }
 .check-btn:active { background: var(--surface-2); }
-.check-btn[aria-pressed="true"] { border: 1.5px solid var(--accent); background: var(--accent-weak); color: var(--accent-ink); }
+.check-btn[aria-pressed="true"] { border: 1.5px solid var(--c-exercise); background: var(--surface-2); color: var(--c-exercise); }
 
 /* 広告枠（i-mobile）。広告が実際に描画されるまで .has-ad が付かず、枠ごと隠れる */
 .ad-slot { display: none; margin: 20px auto 8px; text-align: center; max-width: 100%; overflow: hidden; }
