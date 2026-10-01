@@ -33,6 +33,26 @@ function run(storeName, mode, fn) {
   }));
 }
 
+// Run work spanning both stores as one IndexedDB transaction. If any write
+// fails (including quota exhaustion), none of the clears or writes commit.
+function runStores(storeNames, mode, fn) {
+  return open().then((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction(storeNames, mode);
+    const stores = Object.fromEntries(storeNames.map((name) => [name, tx.objectStore(name)]));
+    let result;
+    let operationError = null;
+    try {
+      result = fn(stores);
+    } catch (error) {
+      operationError = error;
+      tx.abort();
+    }
+    tx.oncomplete = () => resolve(result);
+    tx.onerror = () => reject(operationError || tx.error);
+    tx.onabort = () => reject(operationError || tx.error || new Error('IndexedDB transaction aborted'));
+  }));
+}
+
 export const MEAL_TYPES = [
   { id: 'breakfast', label: '朝食', icon: '🌅' },
   { id: 'lunch', label: '昼食', icon: '☀️' },
@@ -56,9 +76,19 @@ export const localStore = {
   getPhoto: (id) => run('photos', 'readonly', (s) => s.get(id)),
   deletePhoto: (id) => run('photos', 'readwrite', (s) => s.delete(id)),
   getAllPhotos: () => run('photos', 'readonly', (s) => s.getAll()),
-  async clearAll() {
-    await run('days', 'readwrite', (s) => s.clear());
-    await run('photos', 'readwrite', (s) => s.clear());
+  clearAll() {
+    return runStores(['days', 'photos'], 'readwrite', ({ days, photos }) => {
+      days.clear();
+      photos.clear();
+    });
+  },
+  replaceAll(daysToSave, photosToSave) {
+    return runStores(['days', 'photos'], 'readwrite', ({ days, photos }) => {
+      days.clear();
+      photos.clear();
+      for (const day of daysToSave) days.put(day);
+      for (const photo of photosToSave) photos.put(photo);
+    });
   },
 };
 
@@ -85,6 +115,29 @@ export const getPhoto = (id) => store.getPhoto(id);
 export const deletePhoto = (id) => store.deletePhoto(id);
 export const getAllPhotos = () => store.getAllPhotos();
 export const clearAll = () => store.clearAll();
+
+// Local storage has a truly atomic implementation. Remote stores cannot span
+// an arbitrary number of documents atomically, so preserve a complete backup
+// and restore it if any write fails.
+export async function replaceAllData(days, photos) {
+  if (typeof store.replaceAll === 'function') return store.replaceAll(days, photos);
+
+  const [oldDays, oldPhotos] = await Promise.all([store.getAllDays(), store.getAllPhotos()]);
+  try {
+    await store.clearAll();
+    for (const photo of photos) await store.putPhoto(photo);
+    for (const day of days) await store.putDay(day);
+  } catch (importError) {
+    try {
+      await store.clearAll();
+      for (const photo of oldPhotos) await store.putPhoto(photo);
+      for (const day of oldDays) await store.putDay(day);
+    } catch (rollbackError) {
+      throw new AggregateError([importError, rollbackError], 'Import and rollback both failed');
+    }
+    throw importError;
+  }
+}
 
 export function dayTotal(day) {
   let total = 0;

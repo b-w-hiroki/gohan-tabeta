@@ -4,7 +4,7 @@
   "description": "食事・運動・カロリーをカレンダーで記録するPWA",
   "type": "module",
   "scripts": {
-    "check": "for f in js/*.js sw.js; do node --check \"$f\" || exit 1; done",
+    "check": "node tests/check-syntax.mjs",
     "test": "npm run check && node tests/run-all.mjs"
   },
   "devDependencies": {
