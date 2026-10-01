@@ -49,24 +49,26 @@ export default {
     await page.context().close();
   },
 
-  async 'one-tap workout and gym checks toggle and show on the calendar'({ browser, base }) {
+  async 'one-tap workout check toggles and highlights the calendar day'({ browser, base }) {
     const page = await openPage(browser, base);
     await page.go('#/today', '.tabs');
     await page.click('.tab-exercise'); await page.waitForTimeout(400);
-    await page.click('.check-workout'); await page.waitForTimeout(300);
-    await page.click('.check-gym'); await page.waitForTimeout(300);
+    await page.click('.check-btn'); await page.waitForTimeout(300);
     let day = await dayOf(page);
-    assertEq(day.workout && day.gym, true, 'both checked');
-    assertEq(await page.getAttribute('.check-gym', 'aria-pressed'), 'true', 'gym pressed');
+    assertEq(day.workout, true, 'checked');
+    assertEq(await page.getAttribute('.check-btn', 'aria-pressed'), 'true', 'pressed');
     assertEq((await page.textContent('.tab-exercise .tab-kcal')).trim(), '✓', 'tab shows check');
-    await page.click('.check-workout'); await page.waitForTimeout(300);
-    day = await dayOf(page);
-    assertEq(day.workout, undefined, 'workout cleared');
-    assertEq(day.gym, true, 'gym kept');
     await page.go('#/', '.cal-grid');
-    assertEq(await page.locator('.cal-cell.today .dot-exercise').count(), 1, 'exercise dot');
-    assertEq(await page.locator('.cal-cell.today .dot-gym').count(), 1, 'gym dot');
+    assertEq(await page.locator('.cal-cell.today.exercised').count(), 1, 'calendar highlight');
     assertEq((await page.textContent('.month-summary')).replace(/\s+/g, '').includes('運動1日'), true, 'month count');
+    // A day saved with the earlier gym button counts the same, and one tap clears it.
+    await seed(page, async (db, u) => { const d = await db.getDay(u.todayKey()); delete d.workout; d.gym = true; await db.putDay(d); });
+    await page.go('#/today', '.tabs');
+    await page.click('.tab-exercise'); await page.waitForTimeout(400);
+    assertEq(await page.getAttribute('.check-btn', 'aria-pressed'), 'true', 'legacy gym pressed');
+    await page.click('.check-btn'); await page.waitForTimeout(300);
+    day = await dayOf(page);
+    assertEq(!!(day.workout || day.gym), false, 'cleared');
     assertNoErrors(page, 'checks');
     await page.context().close();
   },

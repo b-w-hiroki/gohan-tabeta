@@ -1,6 +1,6 @@
 import {
   MEAL_TYPES, getDay, putDay, getDaysInRange, getAllDays, putPhoto, getPhoto, deletePhoto,
-  getAllPhotos, clearAll, replaceAllData, dayTotal, mealTotal, hasContent, exerciseTotal, didExercise, EXERCISE_CHECKS, useStore, localStore, dayItems,
+  getAllPhotos, clearAll, replaceAllData, dayTotal, mealTotal, hasContent, exerciseTotal, didExercise, isWorkoutChecked, useStore, localStore, dayItems,
 } from './db.js';
 import { prepareBackupText } from './backup.js';
 import { FOOD_PRESETS, EXERCISE_PRESETS } from './foods.js';
@@ -169,15 +169,13 @@ async function renderMonth(month) {
     const over = total > goal;
     const wd = new Date(y, m - 1, d).getDay();
     grid.append(h('button', {
-      class: `cal-cell${key === today ? ' today' : ''}${key > today ? ' future' : ''}`,
+      class: `cal-cell${key === today ? ' today' : ''}${key > today ? ' future' : ''}${exercised ? ' exercised' : ''}`,
       onclick: () => { location.hash = key === today ? '#/today' : `#/day/${key}`; },
-      'aria-label': `${m}月${d}日 ${total ? `${total}kcal` : '記録なし'}${exercised ? ' 運動あり' : ''}${rec?.gym ? ' ジム' : ''}`,
+      'aria-label': `${m}月${d}日 ${total ? `${total}kcal` : '記録なし'}${exercised ? ' 運動あり' : ''}`,
     },
     h('span', { class: `cal-num wd-${wd}` }, d),
     h('span', { class: 'cal-dots' },
-      dots.map((t) => h('i', { class: `dot dot-${t.id}` })),
-      exercised ? h('i', { class: 'dot dot-exercise' }) : null,
-      rec?.gym ? h('i', { class: 'dot dot-gym' }) : null),
+      dots.map((t) => h('i', { class: `dot dot-${t.id}` }))),
     total ? h('span', { class: `cal-kcal${over ? ' over' : ''}` }, fmt(total)) : null));
   }
 
@@ -186,8 +184,7 @@ async function renderMonth(month) {
     grid,
     h('div', { class: 'legend' },
       MEAL_TYPES.map((t) => h('span', {}, h('i', { class: `dot dot-${t.id}` }), t.label)),
-      h('span', {}, h('i', { class: 'dot dot-exercise' }), '運動'),
-      h('span', {}, h('i', { class: 'dot dot-gym' }), 'ジム'),
+      h('span', {}, h('i', { class: 'exercise-sample' }), '運動'),
       h('span', { title: `目標${fmt(goal)}kcal` }, h('b', { class: 'over-sample' }, '赤字'), '=目標超')),
     recordedDays || exerciseDays ? h('div', { class: 'month-summary' },
       h('span', {}, '記録 ', h('strong', {}, recordedDays), '日'),
@@ -446,16 +443,16 @@ function renderExerciseCard(day, save) {
       h('span', { class: 'item-kcal' }, `-${fmt(ex.kcal)} kcal`),
       icon('chevron-right', 16)))));
 
-  // One tap records "worked out" / "went to the gym"; tapping again clears it.
-  const checks = h('div', { class: 'check-btns' },
-    EXERCISE_CHECKS.map((c) => h('button', {
-      class: `check-btn check-${c.id}`, type: 'button', 'aria-pressed': String(!!day[c.id]),
-      onclick: async () => {
-        if (day[c.id]) delete day[c.id]; else day[c.id] = true;
-        toast(day[c.id] ? `「${c.label}」を記録しました` : `「${c.label}」を取り消しました`);
-        await save();
-      },
-    }, icon(day[c.id] ? 'check' : 'plus', 18), c.label)));
+  // One tap records "worked out"; tapping again clears it.
+  const checked = isWorkoutChecked(day);
+  const check = h('button', {
+    class: 'check-btn', type: 'button', 'aria-pressed': String(checked),
+    onclick: async () => {
+      if (checked) { delete day.workout; delete day.gym; } else day.workout = true;
+      toast(checked ? '「運動した」を取り消しました' : '「運動した」を記録しました');
+      await save();
+    },
+  }, icon(checked ? 'check' : 'plus', 18), '運動した');
 
   const pending = getWatchPending() === day.date;
   const paste = async () => { if (await pasteWatchKcal(day.date)) render(); };
@@ -464,7 +461,7 @@ function renderExerciseCard(day, save) {
     h('header', { class: 'meal-head' },
       h('h2', {}, '運動'),
       h('span', { class: 'meal-kcal' }, total ? `-${fmt(total)} kcal` : '')),
-    checks,
+    check,
     h('div', { class: 'items-wrap' }, items,
       day.exercises.length ? null : h('p', { class: 'empty' }, didExercise(day)
         ? '種目やkcalは「運動を追加」で記録' : '運動はまだ記録がありません')),
