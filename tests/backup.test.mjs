@@ -99,6 +99,11 @@ export default {
     missing.photos = [];
     await upload(page, JSON.stringify(missing));
     assertEq(JSON.stringify(await snapshot(page)), before, 'missing photo');
+
+    const oversized = backup();
+    oversized.photos[0].data = `data:image/png;base64,${'A'.repeat(2_800_000)}`;
+    await upload(page, JSON.stringify(oversized));
+    assertEq(JSON.stringify(await snapshot(page)), before, 'oversized photo');
     assertNoErrors(page, 'rejected backups');
     await page.context().close();
   },

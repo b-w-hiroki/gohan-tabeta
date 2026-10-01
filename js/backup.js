@@ -1,5 +1,7 @@
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 const DATA_URL = /^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/]*={0,2})$/i;
+const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
+const MAX_TOTAL_PHOTO_BYTES = 100 * 1024 * 1024;
 
 function isDateKey(value) {
   if (typeof value !== 'string' || !DATE_KEY.test(value)) return false;
@@ -23,6 +25,8 @@ async function decodePhoto(photo, index) {
   if (typeof photo.data !== 'string') invalid(`photos[${index}].data is missing`);
   const match = DATA_URL.exec(photo.data);
   if (!match || match[2].length === 0 || match[2].length % 4 !== 0) invalid(`photos[${index}].data is not a valid image`);
+  const estimatedBytes = Math.floor(match[2].length * 3 / 4);
+  if (estimatedBytes > MAX_PHOTO_BYTES) invalid(`photos[${index}].data is too large`);
   let binary;
   try { binary = atob(match[2]); } catch { invalid(`photos[${index}].data is not valid base64`); }
   if (!binary.length) invalid(`photos[${index}].data is empty`);
@@ -84,12 +88,18 @@ export async function prepareBackupText(text) {
   }
 
   const photoIds = new Set();
-  const photos = await Promise.all((data.photos || []).map(async (photo, index) => {
+  const photos = [];
+  let totalPhotoBytes = 0;
+  // Decode one photo at a time to avoid retaining many ImageBitmaps at once on
+  // memory-constrained phones during a large restore.
+  for (const [index, photo] of (data.photos || []).entries()) {
     const decoded = await decodePhoto(photo, index);
     if (photoIds.has(decoded.id)) invalid(`duplicate photo ${decoded.id}`);
     photoIds.add(decoded.id);
-    return decoded;
-  }));
+    totalPhotoBytes += decoded.blob.size;
+    if (totalPhotoBytes > MAX_TOTAL_PHOTO_BYTES) invalid('total photo data is too large');
+    photos.push(decoded);
+  }
   for (const id of references) if (!photoIds.has(id)) invalid(`referenced photo ${id} is missing`);
 
   return { days: data.days, photos, settings };
