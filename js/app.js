@@ -927,8 +927,9 @@ function renderDataPanel() {
       h('div', { class: 'row' },
         h('button', { class: 'secondary', onclick: exportData }, 'エクスポート'),
         h('label', { class: 'button secondary' }, fileInput, 'インポート'))),
-    h('section', { class: 'card' },
+    h('section', { class: 'card install-card' },
       h('h2', {}, 'ホーム画面に追加'),
+      h('a', { class: 'settings-news-corner', href: './news.html', 'aria-label': 'お知らせ', title: 'お知らせ' }, '📣'),
       h('p', { class: 'hint' }, 'iPhone: 共有 →「ホーム画面に追加」／Android: メニュー →「ホーム画面に追加」')));
 }
 
