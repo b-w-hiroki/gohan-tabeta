@@ -1,7 +1,8 @@
 import {
   MEAL_TYPES, getDay, putDay, getDaysInRange, getAllDays, putPhoto, getPhoto, deletePhoto,
-  getAllPhotos, clearAll, dayTotal, mealTotal, hasContent, exerciseTotal, didExercise, EXERCISE_CHECKS, useStore, localStore, dayItems,
+  getAllPhotos, clearAll, replaceAllData, dayTotal, mealTotal, hasContent, exerciseTotal, didExercise, EXERCISE_CHECKS, useStore, localStore, dayItems,
 } from './db.js';
+import { prepareBackupText } from './backup.js';
 import { FOOD_PRESETS, EXERCISE_PRESETS } from './foods.js';
 import {
   WEEKDAYS, pad, toKey, fromKey, todayKey, addDays, uid, fmt, h, getGoal, setGoal, shortDate,
@@ -747,18 +748,12 @@ async function exportData() {
 }
 
 async function importData(file) {
-  const data = JSON.parse(await file.text());
-  if (data.app !== 'gohan-tabeta' || !Array.isArray(data.days)) throw new Error('形式が違います');
+  const data = await prepareBackupText(await file.text());
   if (!confirm('現在のデータを上書きしてインポートしますか？')) return false;
-  await clearAll();
-  for (const p of data.photos || []) {
-    const blob = await (await fetch(p.data)).blob();
-    await putPhoto({ id: p.id, date: p.date, blob });
-  }
-  for (const d of data.days) await putDay(d);
-  if (data.goalKcal) setGoal(data.goalKcal);
-  if (data.profile) setProfile(data.profile);
-  if (data.settings?.myFoods) setMyFoods(data.settings.myFoods);
+  await replaceAllData(data.days, data.photos);
+  if (data.settings.goalKcal) setGoal(data.settings.goalKcal);
+  if (data.settings.profile) setProfile(data.settings.profile);
+  if (data.settings.myFoods) setMyFoods(data.settings.myFoods);
   return true;
 }
 
