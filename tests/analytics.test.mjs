@@ -26,15 +26,16 @@ export default {
     if (!hits.some((u) => u.includes('id=G-TEST123'))) throw new Error('gtag.js not requested');
     await page.context().close();
   },
-  async 'production build uses the issued measurement ID'({ browser, base }) {
+  async 'production build uses the issued ID and skips automated browsers'({ browser, base }) {
+    const fs = await import('node:fs');
+    const src = fs.readFileSync(new URL('../js/analytics.js', import.meta.url), 'utf8');
+    if (!src.includes("'G-1SHZQRFM6P'")) throw new Error('measurement ID missing');
     const page = await openPage(browser, base);
     const hits = [];
-    page.on('request', (r) => { if (/googletagmanager\.com\/gtag\/js/.test(r.url())) hits.push(r.url()); });
+    page.on('request', (r) => { if (/googletagmanager|google-analytics/.test(r.url())) hits.push(r.url()); });
     await page.goto(`${base}/`); await page.waitForSelector('.hero');
     await page.waitForTimeout(300);
-    const cfg = await page.evaluate(() => (window.dataLayer || []).map((a) => Array.from(a)).find((a) => a[0] === 'config'));
-    if (!cfg || cfg[1] !== 'G-1SHZQRFM6P') throw new Error(`bad config ${JSON.stringify(cfg)}`);
-    if (!hits.some((u) => u.includes('id=G-1SHZQRFM6P'))) throw new Error('gtag.js not requested');
+    if (hits.length) throw new Error(`GA requested from an automated browser: ${hits}`);
     await page.context().close();
   },
 };
