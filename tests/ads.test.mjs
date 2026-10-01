@@ -8,8 +8,7 @@ const CONFIG = { pid: 99, spots: { lp: SPOT, login: SPOT, stats: SPOT } };
 const FAKE_SDK = `(function(){
   function draw(o){ var el=document.getElementById(o.elementid); if(!el) return;
     var b=document.createElement('div'); b.className='fake-banner'; b.style.cssText='width:320px;height:50px;background:#ccc'; el.appendChild(b); }
-  var q=window.adsbyimobile||[]; for (var i=0;i<q.length;i++) draw(q[i]);
-  window.adsbyimobile={push:draw};
+  var q=window.adsbyimobile||[]; var pending=q.splice(0); for (var i=0;i<pending.length;i++) draw(pending[i]);
 })();`;
 
 async function withAds(page) {
@@ -102,6 +101,26 @@ export default {
       return !!(guest.compareDocumentPosition(ad) & Node.DOCUMENT_POSITION_FOLLOWING);
     });
     if (!order) throw new Error('login ad is not below the guest button');
+    await page.context().close();
+  },
+
+  async 'client-side navigation flushes a spot queued after the SDK already ran'({ browser, base }) {
+    const page = await openPage(browser, base, { local: false, cloud: true });
+    await withAds(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${base}/app.html`);
+    await page.waitForSelector('.ad-slot[data-ad-spot="login"].has-ad .fake-banner');
+    await page.click('.auth-guest button');
+    await page.evaluate(() => { location.hash = '#/stats'; });
+    await page.waitForSelector('.ad-slot[data-ad-spot="stats"].has-ad .fake-banner');
+    await page.evaluate(() => { location.hash = '#/settings'; });
+    await page.waitForSelector('.segment');
+    await page.evaluate(() => { location.hash = '#/stats'; });
+    await page.waitForSelector('.ad-slot[data-ad-spot="stats"].has-ad .fake-banner');
+    const loaderCount = await page.locator('script[data-imobile-loader]').count();
+    if (loaderCount !== 2) throw new Error(`expected two SDK executions, got ${loaderCount}`);
+    const bannerCount = await page.locator('.ad-slot[data-ad-spot="stats"] .fake-banner').count();
+    if (bannerCount !== 1) throw new Error(`expected one reused stats banner, got ${bannerCount}`);
     await page.context().close();
   },
 };

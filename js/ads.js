@@ -34,6 +34,29 @@
 
   var LOADER = 'https://imp-adedge.i-mobile.co.jp/script/v1/spot.js?20220104';
   var seq = 0;
+  var sdkLoading = false;
+  var enqueueSeq = 0;
+  var dynamicSlots = {};
+
+  // The production SDK drains the array that exists when spot.js executes, but
+  // does not replace push() with a live handler. Load it again for spots added
+  // later by client-side navigation (login -> dashboard, etc.).
+  function flushSdkQueue() {
+    if (sdkLoading || !Array.isArray(window.adsbyimobile) || !window.adsbyimobile.length) return;
+    sdkLoading = true;
+    var startedAt = enqueueSeq;
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = LOADER;
+    s.setAttribute('data-imobile-loader', '1');
+    s.onload = function () {
+      sdkLoading = false;
+      // A spot may have been queued after this script started executing.
+      if (Array.isArray(window.adsbyimobile) && window.adsbyimobile.length && enqueueSeq > startedAt) flushSdkQueue();
+    };
+    s.onerror = function () { sdkLoading = false; };
+    document.head.appendChild(s);
+  }
 
   function spotConfig(name) {
     var s = IMOBILE.spots[name];
@@ -56,23 +79,21 @@
     new MutationObserver(function (_, obs) {
       if (el.children.length) { slot.classList.add('has-ad'); obs.disconnect(); }
     }).observe(el, { childList: true, subtree: true });
-    if (!document.querySelector('script[data-imobile-loader]')) {
-      var s = document.createElement('script');
-      s.async = true;
-      s.src = LOADER;
-      s.setAttribute('data-imobile-loader', '1');
-      document.head.appendChild(s);
-    }
-    (window.adsbyimobile = window.adsbyimobile || []).push({
+    var queue = (window.adsbyimobile = window.adsbyimobile || []);
+    enqueueSeq++;
+    queue.push({
       pid: IMOBILE.pid, mid: v.mid, asid: v.asid, type: 'banner', display: 'inline', elementid: el.id,
     });
+    // Test doubles and some SDK versions install a live push handler. Only the
+    // plain array form needs another execution of spot.js.
+    if (Array.isArray(queue)) flushSdkQueue();
   }
 
   function watch(slot) {
     if (!spotConfig(slot.dataset.adSpot)) return; // 未設定なら監視もしない
     // 1画面に収める画面では、画面の高さが足りない端末では出さない（中身を潰さないため）
     var minH = Number(slot.dataset.adMinHeight || 0);
-    if (minH && window.innerHeight < minH) return;
+    if (minH && window.innerHeight < minH) { delete slot.dataset.adWatch; return; }
     if (!('IntersectionObserver' in window)) { load(slot); return; }
     var io = new IntersectionObserver(function (entries) {
       for (var i = 0; i < entries.length; i++) {
@@ -85,12 +106,14 @@
 
   /** 枠の要素を作る（JS で描く画面用）。opts.minHeight: この高さ未満の画面では出さない。画面に入れたあと mount を呼ぶ */
   function slot(name, opts) {
+    if (dynamicSlots[name]) return dynamicSlots[name];
     var d = document.createElement('div');
     d.className = 'ad-slot';
     d.dataset.adSpot = name;
     if (opts && opts.minHeight) d.dataset.adMinHeight = String(opts.minHeight);
     d.innerHTML = '<div class="ad-label">広告</div><div class="ad-content"></div>';
-    return d;
+    dynamicSlots[name] = d;
+    return dynamicSlots[name];
   }
 
   /** root 以下の未処理の枠を有効にする */
