@@ -56,7 +56,7 @@
     .site-header { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 90%, transparent);
       backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
     .site-header .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; }
-    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text);
+    .brand { display: flex; align-items: center; gap: 10px; min-height: 44px; text-decoration: none; color: var(--text);
       font-family: var(--font-brand); font-weight: 900; font-size: 19px; }
     .brand img { width: 32px; height: 32px; border-radius: 9px; }
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 24px;
@@ -65,17 +65,20 @@
     .btn-primary { background: var(--accent-ink); color: var(--on-accent); box-shadow: 0 6px 16px rgb(194 65 12 / .3); }
     @media (prefers-color-scheme: dark) { .btn-primary { background: var(--accent); } }
     .btn-primary:active { transform: translateY(1px); }
-    .btn-sm { min-height: 40px; padding: 0 16px; font-size: 14px; border-radius: 12px; }
-    .link { font-weight: 700; }
+    .btn-sm { min-height: 44px; padding: 0 16px; font-size: 14px; border-radius: 12px; }
+    .link { display: inline-flex; align-items: center; min-height: 44px; font-weight: 700; }
 
     /* hero */
     .hero { padding: 44px 0 24px; display: grid; gap: 32px; align-items: center; }
+    .hero > div:first-child { min-width: 0; }
     .eyebrow { margin: 0 0 12px; font-weight: 700; font-size: 14px; color: var(--muted); letter-spacing: .04em; }
-    .hero h1 { margin: 0; font-family: var(--font-brand); font-weight: 900; font-size: clamp(30px, 8.6vw, 50px); line-height: 1.35; letter-spacing: .01em; }
+    .hero h1 { margin: 0; font-family: var(--font-brand); font-weight: 900; font-size: clamp(24px, 7.2vw, 44px); line-height: 1.35; letter-spacing: .01em; }
     .mark { background: linear-gradient(transparent 62%, var(--marker) 62%); padding: 0 .05em; }
     .nw { white-space: nowrap; }
+    .hero-phrase, .hero-line { display: inline-block; max-width: 100%; }
+    .hero-phrase { white-space: nowrap; }
     .hero p.lead { margin: 20px 0 26px; font-size: 16px; color: var(--muted); }
-    .cta { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+    .cta { display: flex; align-items: center; column-gap: 20px; row-gap: 12px; flex-wrap: wrap; }
     .note { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
 
     /* phone mockups */
@@ -141,6 +144,9 @@
 
     @media (min-width: 860px) {
       .hero { grid-template-columns: 1.05fr 1fr; padding: 72px 0 40px; }
+      .hero h1 { font-size: clamp(36px, 3.8vw, 44px); }
+      .phones { height: clamp(390px, 40vw, 472px); }
+      .phone { width: min(48%, 230px); }
       .cards { grid-template-columns: repeat(3, 1fr); }
       .feature { grid-template-columns: 260px 1fr; gap: 48px; }
       .feature.rev { grid-template-columns: 1fr 260px; }
@@ -158,7 +164,7 @@
   <!-- birdman studio の姉妹アプリ導線（4アプリ共通）。アプリ一覧は js/sister-apps.js の APPS だけを編集する -->
   <style>
     .bs-sw { position: relative; display: inline-flex; }
-    .bs-sw-btn { width: 40px; height: 40px; border: 0; border-radius: 10px; background: transparent; color: inherit; opacity: .7; display: grid; place-items: center; cursor: pointer; padding: 0; }
+    .bs-sw-btn { width: 44px; height: 44px; border: 0; border-radius: 10px; background: transparent; color: inherit; opacity: .7; display: grid; place-items: center; cursor: pointer; padding: 0; }
     .bs-sw-btn:hover, .bs-sw-btn[aria-expanded="true"] { opacity: 1; background: rgba(128, 128, 128, .12); }
     .bs-sw-pop { position: fixed; right: 12px; top: 60px; z-index: 1001; width: min(290px, calc(100vw - 24px)); padding: 10px; border-radius: 14px; text-align: left;
       background: var(--surface, #fff); color: var(--text, var(--ink, #1c1917)); border: 1px solid var(--border, var(--line, rgba(128, 128, 128, .25))); box-shadow: 0 12px 32px rgb(0 0 0 / .16);
@@ -172,11 +178,9 @@
     .bs-sw-pop small { display: block; font-size: 11px; line-height: 1.4; opacity: .7; }
     /* ボタンを足してもヘッダーの文字が折り返さないように */
     .site-header .brand, .site-header .btn, header.top .brand, header.top .btn { white-space: nowrap; }
-    @media (max-width: 400px) { .bs-sw-btn { width: 34px; height: 34px; } }
     @media (max-width: 360px) {
       .site-header .brand, header.top .brand { font-size: 15px; gap: 6px; }
       .site-header .btn, header.top .btn { padding: 0 10px; font-size: 13px; }
-      .bs-sw-btn { width: 30px; height: 30px; }
     }
     .bs-foot { box-sizing: border-box; width: 100%; max-width: 640px; align-self: center; margin: 0 auto 20px; padding: 4px 0 18px; border-bottom: 1px solid rgba(128, 128, 128, .2); text-align: center; }
     .bs-foot p { margin: 0 0 10px; font-size: 12px; font-weight: 700; }
@@ -192,7 +196,7 @@
     .bs-bar { height: 40px; display: flex; align-items: center; justify-content: space-between; max-width: 1080px; margin: 0 auto;
       padding: 0 max(12px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); }
     .bs-bar-brand { font-size: 12px; font-weight: 700; letter-spacing: .04em; }
-    .bs-bar .bs-sw-btn { width: 36px; height: 36px; opacity: 1; }
+    .bs-bar .bs-sw-btn { width: 44px; height: 44px; opacity: 1; }
   </style>
 </head>
 <body>
@@ -209,7 +213,7 @@
       <div class="hero">
         <div>
           <p class="eyebrow">カレンダーで続ける、かんたん食事記録</p>
-          <h1><span class="mark nw">「何食べたっけ？」</span><span class="nw">を、</span><br>カレンダーで<br>ひと目に。</h1>
+          <h1><span class="mark hero-phrase">「何食べたっけ？」を、</span><br><span class="hero-line">カレンダーで</span><br><span class="hero-line">ひと目に。</span></h1>
           <p class="lead">朝・昼・晩に食べたものをタップで記録。カロリーは自動で合計、写真も残せます。週や月の振り返り、消費カロリーとの差から「あと何kg」の目安まで、ひとつのアプリで。</p>
           <div class="cta">
             <a class="btn btn-primary" href="./app.html">無料ではじめる</a>
