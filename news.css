@@ -8,6 +8,7 @@
   --news-border: #ded9d1;
   --news-accent: #7b5c3e;
   --news-accent-soft: #eee3d7;
+  --news-on-accent: #ffffff;
   --news-focus: #2563eb;
   --news-shadow: 0 8px 28px rgb(71 58 45 / 10%);
 }
@@ -30,7 +31,7 @@ a:focus-visible { outline: 3px solid var(--news-focus); outline-offset: 3px; bor
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 36px;
+  min-height: 44px;
   padding: 5px 12px;
   border-radius: 999px;
   background: var(--news-accent-soft);
@@ -64,7 +65,7 @@ a:focus-visible { outline: 3px solid var(--news-focus); outline-offset: 3px; bor
 .news-arrow { color: var(--news-accent); font-size: 22px; font-weight: 800; }
 .news-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: var(--news-subtle); font-size: 13px; }
 .news-category { display: inline-flex; align-items: center; min-height: 28px; padding: 2px 10px; border-radius: 999px; background: var(--news-accent-soft); color: var(--news-accent); font-size: 12px; font-weight: 800; }
-.news-unread { display: inline-flex; align-items: center; min-height: 28px; padding: 2px 10px; border-radius: 999px; background: var(--news-accent); color: #fff; font-size: 12px; font-weight: 800; }
+.news-unread { display: inline-flex; align-items: center; min-height: 28px; padding: 2px 10px; border-radius: 999px; background: var(--news-accent); color: var(--news-on-accent); font-size: 12px; font-weight: 800; }
 .news-empty {
   padding: 52px 24px;
   border: 1px dashed var(--news-border);
@@ -108,7 +109,7 @@ a:focus-visible { outline: 3px solid var(--news-focus); outline-offset: 3px; bor
   border-radius: 16px;
   background: var(--news-accent);
   box-shadow: 0 8px 24px rgb(0 0 0 / 20%);
-  color: #fff;
+  color: var(--news-on-accent);
   font-weight: 800;
   text-decoration: none;
 }
@@ -123,6 +124,7 @@ a:focus-visible { outline: 3px solid var(--news-focus); outline-offset: 3px; bor
     --news-border: #403a33;
     --news-accent: #dfb98e;
     --news-accent-soft: #3b2f24;
+    --news-on-accent: #171512;
     --news-shadow: 0 10px 30px rgb(0 0 0 / 28%);
   }
 }
