@@ -42,6 +42,7 @@ a:focus-visible { outline: 3px solid var(--news-focus); outline-offset: 3px; bor
 .news-header { margin: 18px 0 28px; }
 .news-header h1 { margin: 0; font-size: clamp(28px, 7vw, 40px); line-height: 1.25; letter-spacing: -.02em; }
 .news-header p { margin: 10px 0 0; color: var(--news-subtle); }
+.news-header .news-storage-note { margin-top: 6px; font-size: 13px; }
 .news-list { display: grid; gap: 14px; }
 .news-card {
   display: grid;
@@ -63,6 +64,7 @@ a:focus-visible { outline: 3px solid var(--news-focus); outline-offset: 3px; bor
 .news-arrow { color: var(--news-accent); font-size: 22px; font-weight: 800; }
 .news-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: var(--news-subtle); font-size: 13px; }
 .news-category { display: inline-flex; align-items: center; min-height: 28px; padding: 2px 10px; border-radius: 999px; background: var(--news-accent-soft); color: var(--news-accent); font-size: 12px; font-weight: 800; }
+.news-unread { display: inline-flex; align-items: center; min-height: 28px; padding: 2px 10px; border-radius: 999px; background: var(--news-accent); color: #fff; font-size: 12px; font-weight: 800; }
 .news-empty {
   padding: 52px 24px;
   border: 1px dashed var(--news-border);

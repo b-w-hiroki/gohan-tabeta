@@ -3,6 +3,22 @@
 
   const CATEGORY_LABELS = { info: 'お知らせ', new: '新機能', improve: '改善', fix: '不具合修正' };
   const app = window.NEWS_APP || { name: 'アプリ', icon: '📣', appHref: './', appLabel: 'アプリに戻る' };
+  const readStorageKey = app.readStorageKey || `news-read-ids:${app.name}`;
+
+  function readIds() {
+    try {
+      const value = JSON.parse(localStorage.getItem(readStorageKey) || '[]');
+      return new Set(Array.isArray(value) ? value.filter((id) => typeof id === 'string') : []);
+    } catch {
+      return new Set();
+    }
+  }
+
+  function markRead(id) {
+    const ids = readIds();
+    ids.add(id);
+    try { localStorage.setItem(readStorageKey, JSON.stringify([...ids])); } catch { /* storage may be unavailable */ }
+  }
 
   function el(tag, attrs = {}, children = []) {
     const node = document.createElement(tag);
@@ -46,12 +62,14 @@
   }
 
   function renderList(root, items) {
+    const read = readIds();
     document.title = `お知らせ — ${app.name}`;
     root.append(
       el('a', { class: 'news-brand', href: app.appHref, text: `${app.icon} ${app.name}` }),
       el('header', { class: 'news-header' }, [
         el('h1', { text: 'お知らせ' }),
         el('p', { text: `${app.name}からの大切なお知らせや更新情報を掲載します。` }),
+        el('p', { class: 'news-storage-note', text: '既読状態は、この端末のブラウザだけに保存されます。' }),
       ]),
     );
     if (!items.length) {
@@ -67,6 +85,7 @@
       const meta = el('div', { class: 'news-meta' }, [
         el('time', { datetime: item.date, text: dateLabel(item.date) }),
         category(item),
+        read.has(item.id) ? null : el('span', { class: 'news-unread', text: '未読' }),
       ]);
       list.append(el('a', { class: 'news-card', href: `?id=${encodeURIComponent(item.id)}` }, [
         el('div', {}, [meta, el('h2', { text: item.title }), item.summary ? el('p', { text: item.summary }) : null]),
@@ -88,6 +107,7 @@
       );
       return;
     }
+    markRead(item.id);
     document.title = `${item.title} — ${app.name}`;
     const article = el('article', { class: 'news-article' });
     article.append(
