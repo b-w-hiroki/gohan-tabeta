@@ -1,10 +1,14 @@
 // Offline cache for the app shell. Bump VERSION when shipping changes to static files.
-const VERSION = 'v27';
+const VERSION = 'v29';
 const CACHE = `gohan-tabeta-${VERSION}`;
 const ASSETS = [
   './',
   './index.html',
   './app.html',
+  './news.html',
+  './news.css',
+  './news-data.js',
+  './news-page.js',
   './privacy.html',
   './terms.html',
   './css/style.css',
