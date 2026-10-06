@@ -929,6 +929,7 @@ function renderDataPanel() {
         h('label', { class: 'button secondary' }, fileInput, 'インポート'))),
     h('section', { class: 'card install-card' },
       h('h2', {}, 'ホーム画面に追加'),
+      h('a', { class: 'settings-news-corner settings-studio-corner', href: 'https://birdman-studio.com/', target: '_blank', rel: 'noopener noreferrer', 'aria-label': 'birdman studio・ほかのアプリ', title: 'birdman studio・ほかのアプリ' }, '🏠'),
       h('a', { class: 'settings-news-corner', href: './news.html', 'aria-label': 'お知らせ', title: 'お知らせ' }, '📣'),
       h('p', { class: 'hint' }, 'iPhone: 共有 →「ホーム画面に追加」／Android: メニュー →「ホーム画面に追加」')));
 }

@@ -47,6 +47,11 @@ export default {
           await page.click(`.settings-view > .segment button:has-text("${tab}")`); await page.waitForTimeout(200);
           await assertFits(page, `${label} settings ${tab}`);
         }
+        const studioLink = await page.$('a[href="https://birdman-studio.com/"]');
+        if (!studioLink) throw new Error(`${label}: settings brand link is missing`);
+        const studioBox = await studioLink.boundingBox();
+        if (!studioBox || studioBox.height < 44) throw new Error(`${label}: settings brand link tap target is below 44px`);
+        if ((await studioLink.getAttribute('rel')) !== 'noopener noreferrer') throw new Error(`${label}: settings brand link is missing safe rel`);
         assertNoErrors(page, label);
         await page.context().close();
       }
@@ -58,6 +63,16 @@ export default {
       const page = await openPage(browser, base, { device });
       await page.goto(`${base}/`);
       await page.waitForSelector('.hero');
+      const brandLinks = await page.$$('a[href="https://birdman-studio.com/"]');
+      if (brandLinks.length !== 2) throw new Error(`${device}: expected header and footer brand links`);
+      for (const link of brandLinks) {
+        const box = await link.boundingBox();
+        if (!box || box.height < 44) throw new Error(`${device}: brand link tap target is below 44px`);
+      }
+      await page.click('.bs-sw-btn');
+      if (await page.$$eval('.bs-sw-pop a', (links) => links.length) !== 3) throw new Error(`${device}: sister app menu changed`);
+      await page.keyboard.press('Escape');
+      if (await page.isVisible('.bs-sw-pop')) throw new Error(`${device}: Escape did not close sister app menu`);
       const wide = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
       if (wide > 1) throw new Error(`${device}: landing page scrolls sideways by ${wide}px`);
       await page.goto('about:blank');

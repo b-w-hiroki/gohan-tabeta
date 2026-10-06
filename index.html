@@ -184,6 +184,7 @@
     }
     .bs-foot { box-sizing: border-box; width: 100%; max-width: 640px; align-self: center; margin: 0 auto 20px; padding: 4px 0 18px; border-bottom: 1px solid rgba(128, 128, 128, .2); text-align: center; }
     .bs-foot p { margin: 0 0 10px; font-size: 12px; font-weight: 700; }
+    .bs-studio-link { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; color: inherit; text-decoration: none; }
     /* 件数が増えたら横スクロール。収まるうちは中央寄せ（先頭と末尾の auto 余白で中央に見せる） */
     .bs-foot ul { list-style: none; margin: 0; padding: 2px 4px 6px; display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
     .bs-foot ul::-webkit-scrollbar { display: none; }
@@ -195,12 +196,13 @@
     /* 上部の細いヘッダー: birdman studio のアプリ切替（全アプリ共通） */
     .bs-bar { height: 40px; display: flex; align-items: center; justify-content: space-between; max-width: 1080px; margin: 0 auto;
       padding: 0 max(12px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); }
-    .bs-bar-brand { font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+    .bs-bar-brand { display: inline-flex; align-items: center; min-height: 44px; color: inherit; text-decoration: none; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+    .bs-bar-brand:focus-visible, .bs-studio-link:focus-visible { outline: 3px solid currentColor; outline-offset: 2px; }
     .bs-bar .bs-sw-btn { width: 44px; height: 44px; opacity: 1; }
   </style>
 </head>
 <body>
-  <div class="bs-bar"><span class="bs-bar-brand">birdman studio</span><div class="bs-sw"><button type="button" class="bs-sw-btn" aria-label="birdman studio のほかのアプリ" aria-expanded="false" aria-controls="bs-sw-pop"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="5" cy="5" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="19" r="2"/></svg></button><div class="bs-sw-pop" id="bs-sw-pop" hidden><p>birdman studio のアプリ</p><div data-bs-list></div></div></div></div>
+  <div class="bs-bar"><a class="bs-bar-brand" href="https://birdman-studio.com/" target="_blank" rel="noopener noreferrer">birdman studio</a><div class="bs-sw"><button type="button" class="bs-sw-btn" aria-label="birdman studio のほかのアプリ" aria-expanded="false" aria-controls="bs-sw-pop"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="5" cy="5" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="19" r="2"/></svg></button><div class="bs-sw-pop" id="bs-sw-pop" hidden><p>birdman studio のアプリ</p><div data-bs-list></div></div></div></div>
   <header class="site-header">
     <div class="wrap">
       <a class="brand" href="./"><img src="icons/icon.svg" alt="" width="32" height="32">ごはん食べた</a>
@@ -323,7 +325,7 @@
 
   <footer>
     <div class="wrap">
-      <div class="bs-foot"><p>birdman studio のアプリ</p><ul data-bs-foot></ul></div>
+      <div class="bs-foot"><p><a class="bs-studio-link" href="https://birdman-studio.com/" target="_blank" rel="noopener noreferrer">birdman studio のアプリ</a></p><ul data-bs-foot></ul></div>
       <nav><a href="./app.html">アプリを開く</a><a href="./news.html">お知らせ</a><a href="./terms.html">利用規約</a><a href="./privacy.html">プライバシーポリシー</a><a href="mailto:hiroki.torii4649@gmail.com">お問い合わせ</a></nav>
       <p>© 2026 birdman studio</p>
     </div>
