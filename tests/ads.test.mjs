@@ -13,6 +13,8 @@ const FAKE_SDK = `(function(){
 
 async function withAds(page) {
   await page.context().addInitScript((c) => { window.BIRDMAN_ADS_TEST_CONFIG = c; }, CONFIG);
+  // These cases validate the existing login ad placement; auth.test.mjs owns the one-time guide.
+  await page.context().addInitScript(() => localStorage.setItem('launchGuideSeen', '1'));
   await page.route('**/spot.js*', (r) => r.fulfill({ contentType: 'text/javascript', body: FAKE_SDK }));
 }
 

@@ -928,7 +928,8 @@ function renderDataPanel() {
         h('button', { class: 'secondary', onclick: exportData }, 'エクスポート'),
         h('label', { class: 'button secondary' }, fileInput, 'インポート'))),
     h('section', { class: 'card install-card' },
-      h('h2', {}, 'ホーム画面に追加'),
+      h('h2', {}, 'アプリ情報'),
+      h('button', { class: 'settings-news-corner settings-about-corner', type: 'button', onclick: openAbout, 'aria-label': 'アプリについて', title: 'アプリについて' }, 'ℹ️'),
       h('a', { class: 'settings-news-corner settings-studio-corner', href: 'https://birdman-studio.com/', target: '_blank', rel: 'noopener noreferrer', 'aria-label': 'birdman studio・ほかのアプリ', title: 'birdman studio・ほかのアプリ' }, '🏠'),
       h('a', { class: 'settings-news-corner', href: './news.html', 'aria-label': 'お知らせ', title: 'お知らせ' }, '📣'),
       h('p', { class: 'hint' }, 'iPhone: 共有 →「ホーム画面に追加」／Android: メニュー →「ホーム画面に追加」')));
@@ -942,6 +943,14 @@ function getAuthMode() {
 }
 function setAuthMode(v) {
   try { if (v) localStorage.setItem('authMode', v); else localStorage.removeItem('authMode'); } catch { /* ignore */ }
+}
+
+const LAUNCH_GUIDE_KEY = 'launchGuideSeen';
+function launchGuideSeen() {
+  try { return localStorage.getItem(LAUNCH_GUIDE_KEY) === '1'; } catch { return false; }
+}
+function markLaunchGuideSeen() {
+  try { localStorage.setItem(LAUNCH_GUIDE_KEY, '1'); } catch { /* storage unavailable */ }
 }
 
 async function startCloud(user) {
@@ -980,6 +989,36 @@ async function offerMigration(cloud) {
 }
 
 // ---------- login screen ----------
+function renderWelcome() {
+  document.body.classList.add('auth-screen');
+  const configured = isConfigured();
+  const start = () => {
+    markLaunchGuideSeen();
+    setAuthMode('local');
+    document.body.classList.remove('auth-screen');
+    render();
+  };
+  const login = () => {
+    markLaunchGuideSeen();
+    renderLogin();
+  };
+  $app.replaceChildren(h('main', { class: 'auth launch-welcome', 'aria-labelledby': 'launch-title' },
+    h('div', { class: 'auth-hero' },
+      h('img', { src: 'icons/icon.svg', alt: '', class: 'auth-logo', width: 84, height: 84 }),
+      h('p', { class: 'launch-kicker' }, '毎日の食事を、やさしく記録'),
+      h('h1', { id: 'launch-title' }, 'ごはん食べた'),
+      h('p', { class: 'launch-lead' }, '朝・昼・晩の食事や写真を、カレンダーにぽんっと残せます。')),
+    h('div', { class: 'launch-points', 'aria-label': '主な機能' },
+      h('span', {}, '🍚 食事を記録'), h('span', {}, '📅 日ごとに確認'), h('span', {}, '📊 変化を振り返る')),
+    h('div', { class: 'launch-actions' },
+      h('button', { type: 'button', class: 'primary block', onclick: start }, 'はじめる'),
+      h('small', {}, '記録はこの端末に保存されます'),
+      h('button', { type: 'button', class: 'secondary block', disabled: !configured, onclick: login }, 'ログインして同期'),
+      configured ? null : h('p', { class: 'auth-notice' }, 'ログイン・クラウド同期は準備中です'),
+      h('button', { type: 'button', class: 'text-btn launch-about', onclick: openAbout }, 'アプリについて')),
+    h('p', { class: 'auth-footer' }, h('a', { href: './privacy.html' }, 'プライバシーポリシー'), ' ・ ', h('a', { href: './terms.html' }, '利用規約'))));
+}
+
 function renderLogin(message = '') {
   document.body.classList.add('auth-screen');
   let mode = 'login';
@@ -1064,6 +1103,45 @@ function renderLogin(message = '') {
   window.BirdmanAds?.mount($app);
 }
 
+const ABOUT_HISTORY_KEY = 'gohanAbout';
+let aboutDialog = null;
+let aboutLastFocus = null;
+function getAboutDialog() {
+  if (aboutDialog) return aboutDialog;
+  const close = h('button', { type: 'button', class: 'primary block', onclick: () => closeAbout() }, '閉じる');
+  aboutDialog = h('dialog', { class: 'app-about', 'aria-labelledby': 'app-about-title' },
+    h('div', { class: 'app-about-card' },
+      h('img', { src: 'icons/icon.svg', alt: '', width: 64, height: 64 }),
+      h('h2', { id: 'app-about-title' }, 'ごはん食べたについて'),
+      h('p', {}, '食事・カロリー・写真を日ごとのカレンダーに記録し、無理なく振り返るためのアプリです。'),
+      h('ul', {},
+        h('li', {}, 'ログインなしなら記録はこの端末だけに保存'),
+        h('li', {}, 'ログインするとクラウドに同期し、複数端末で利用可能'),
+        h('li', {}, 'バックアップの書き出し・復元にも対応')),
+      h('div', { class: 'app-about-links' }, h('a', { href: './privacy.html' }, 'プライバシーポリシー'), h('a', { href: './terms.html' }, '利用規約')),
+      close));
+  aboutDialog.addEventListener('cancel', (e) => { e.preventDefault(); closeAbout(); });
+  aboutDialog.addEventListener('click', (e) => { if (e.target === aboutDialog) closeAbout(); });
+  document.body.append(aboutDialog);
+  return aboutDialog;
+}
+function openAbout() {
+  const dialog = getAboutDialog();
+  if (dialog.open) return;
+  aboutLastFocus = document.activeElement;
+  history.pushState({ ...(history.state || {}), [ABOUT_HISTORY_KEY]: true }, '');
+  dialog.showModal();
+  dialog.querySelector('button').focus();
+}
+function closeAbout(fromHistory = false) {
+  if (aboutDialog?.open) aboutDialog.close();
+  aboutLastFocus?.focus?.();
+  if (!fromHistory && history.state?.[ABOUT_HISTORY_KEY]) history.back();
+}
+window.addEventListener('popstate', () => {
+  if (aboutDialog?.open && !history.state?.[ABOUT_HISTORY_KEY]) closeAbout(true);
+});
+
 function googleMark() {
   const span = document.createElement('span');
   span.className = 'icon';
@@ -1074,10 +1152,11 @@ function googleMark() {
 // ---------- boot ----------
 async function boot() {
   const mode = getAuthMode();
-  if (!isConfigured() || mode === 'local') { render(); return; }
+  if (mode === 'local') { render(); return; }
   if (mode !== 'cloud' && !redirectPending()) {
-    // Not logged in on this device: show the login screen now and load the SDK in the background.
-    renderLogin();
+    // First launch starts with a short explanation. Returning signed-out users go straight to login.
+    if (!launchGuideSeen()) renderWelcome();
+    else renderLogin();
     initCloud().catch(() => {});
     return;
   }
