@@ -10,7 +10,10 @@ export async function launch() {
 // A page on the app. local=true starts in "use without login" mode.
 // cloud=false serves a null Firebase config so tests never depend on the real project.
 export async function openPage(browser, base, { device = 'iPhone 13', local = true, scheme = 'light', permissions, cloud = false } = {}) {
-  const ctx = await browser.newContext({ ...devices[device], colorScheme: scheme });
+  // App-shell/offline behavior is covered separately. Blocking service workers here keeps
+  // the Firebase config route deterministic across reloads and avoids the installed worker
+  // replacing the test's null config with the production file.
+  const ctx = await browser.newContext({ ...devices[device], colorScheme: scheme, serviceWorkers: 'block' });
   if (permissions) await ctx.grantPermissions(permissions, { origin: base });
   if (local) {
     await ctx.addInitScript(() => {
