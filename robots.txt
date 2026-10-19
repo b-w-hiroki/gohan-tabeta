@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /tests/
+
+Sitemap: https://gohan-tabeta.birdman-studio.com/sitemap.xml
