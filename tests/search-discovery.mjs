@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import staticSearchContract from "./static-search-contract.cjs";
+
+const { auditStaticSearch } = staticSearchContract;
 
 const read = (file) => readFileSync(file, "utf8");
 const root = "https://gohan-tabeta.birdman-studio.com/";
@@ -37,5 +40,7 @@ const manifest = JSON.parse(read("manifest.webmanifest"));
 assert.deepEqual({ id: manifest.id, start_url: manifest.start_url, scope: manifest.scope }, {
   id: "/app.html", start_url: "./app.html", scope: "./",
 });
+
+auditStaticSearch({ baseUrl: root });
 
 console.log("search discovery contract passed");
