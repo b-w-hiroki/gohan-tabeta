@@ -18,14 +18,25 @@ const base = `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch();
 try {
   await mkdir('test-results/landing', {recursive:true});
-  for (const width of [320,390,1180]) for (const colorScheme of ['light','dark']) {
-    const context = await browser.newContext({viewport:{width,height:844},colorScheme,serviceWorkers:'block'});
+  for (const [width,height] of [[320,844],[390,844],[1180,757],[1180,844]]) for (const colorScheme of ['light','dark']) {
+    const context = await browser.newContext({viewport:{width,height},colorScheme,serviceWorkers:'block'});
     const page = await context.newPage();
     const errors=[]; page.on('pageerror',e=>errors.push(e.message));
     await page.route('**/*', r => r.request().url().startsWith(base) ? r.continue() : r.abort());
     await page.goto(base);
     const story = page.locator('.product-story');
     assert.equal(await story.count(),1);
+    const initial = await page.locator('.hero').evaluate(el => {
+      const copy = el.firstElementChild.getBoundingClientRect();
+      const card = el.querySelector('.product-story').getBoundingClientRect();
+      const cta = el.querySelector('.cta a').getBoundingClientRect();
+      const calendar = el.querySelector('.story-calendar').getBoundingClientRect();
+      return { copyTop:copy.top, cardTop:card.top, ctaBottom:cta.bottom, ctaTop:cta.top,
+        calendarHeight:calendar.height, calendarWidth:calendar.width };
+    });
+    assert.ok(initial.ctaTop >= 0 && initial.ctaBottom <= height, JSON.stringify(initial));
+    assert.ok(initial.calendarHeight <= initial.calendarWidth, JSON.stringify(initial));
+    if (width >= 860) assert.ok(Math.abs(initial.copyTop-initial.cardTop) <= 1, JSON.stringify(initial));
     await story.scrollIntoViewIfNeeded();
     const geometry = await story.evaluate(el=>({left:el.getBoundingClientRect().left,right:el.getBoundingClientRect().right,width:innerWidth,overflow:document.documentElement.scrollWidth-innerWidth}));
     assert.ok(geometry.left>=0 && geometry.right<=width+1,JSON.stringify(geometry));
@@ -35,11 +46,12 @@ try {
     const cta=page.locator('.hero .cta a[href="./app.html"]');
     assert.equal(await cta.count(),1);
     assert.ok((await cta.boundingBox()).height>=44);
-    await page.screenshot({path:`test-results/landing/${width}-${colorScheme}-story.png`});
-    await page.evaluate(()=>scrollTo(0,0));
-    await page.screenshot({path:`test-results/landing/${width}-${colorScheme}-top.png`});
+    await page.screenshot({path:`test-results/landing/${width}x${height}-${colorScheme}-story.png`});
+    await page.evaluate(()=>{ document.documentElement.style.scrollBehavior="auto"; scrollTo(0,0); });
+    await page.waitForFunction(()=>scrollY===0);
+    await page.screenshot({path:`test-results/landing/${width}x${height}-${colorScheme}-top.png`});
     assert.deepEqual(errors,[]);
     await context.close();
-    console.log(`PASS landing ${width}x844 ${colorScheme}`);
+    console.log(`PASS landing ${width}x${height} ${colorScheme}`);
   }
 } finally { await browser.close(); server.close(); }
