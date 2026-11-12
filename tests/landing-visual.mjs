@@ -32,10 +32,12 @@ try {
       const cta = el.querySelector('.cta a').getBoundingClientRect();
       const calendar = el.querySelector('.story-calendar').getBoundingClientRect();
       return { copyTop:copy.top, cardTop:card.top, ctaBottom:cta.bottom, ctaTop:cta.top,
-        calendarHeight:calendar.height, calendarWidth:calendar.width };
+        calendarTop:calendar.top, calendarBottom:calendar.bottom, calendarHeight:calendar.height, calendarWidth:calendar.width };
     });
     assert.ok(initial.ctaTop >= 0 && initial.ctaBottom <= height, JSON.stringify(initial));
     assert.ok(initial.calendarHeight <= initial.calendarWidth, JSON.stringify(initial));
+    if (width <= 480) assert.ok(height - initial.calendarTop >= 130, JSON.stringify(initial));
+    if (width === 390) assert.ok(initial.calendarBottom <= height, JSON.stringify(initial));
     if (width >= 860) assert.ok(Math.abs(initial.copyTop-initial.cardTop) <= 1, JSON.stringify(initial));
     await story.scrollIntoViewIfNeeded();
     const geometry = await story.evaluate(el=>({left:el.getBoundingClientRect().left,right:el.getBoundingClientRect().right,width:innerWidth,overflow:document.documentElement.scrollWidth-innerWidth}));
