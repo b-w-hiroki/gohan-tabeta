@@ -1,0 +1,31 @@
+name: Landing visual QA
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  landing:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install isolated browser test tool
+        run: npm install --prefix /tmp/landing-qa --ignore-scripts --no-audit --no-fund playwright@1.56.1
+      - name: Install Chromium
+        run: /tmp/landing-qa/node_modules/.bin/playwright install --with-deps chromium
+      - name: Run layout and content checks
+        run: |
+          mkdir -p node_modules
+          ln -s /tmp/landing-qa/node_modules/playwright node_modules/playwright
+          ln -s /tmp/landing-qa/node_modules/playwright-core node_modules/playwright-core
+          node tests/landing-visual.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: landing-screenshots
+          path: test-results/landing
