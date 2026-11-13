@@ -188,7 +188,13 @@
     .story-calendar { aspect-ratio: 1.5; border: 1px solid var(--line, var(--border)); border-radius: 16px; overflow: hidden; }
     .story-calendar img { display: block; width: 100%; height: auto; }
     .story-milk { width: 64px; height: 64px; float: right; margin-left: 12px; }
-    @media (max-width: 480px) { .product-story { padding: 20px; border-radius: 20px; } }
+    @media (max-width: 480px) {
+      .hero { padding-top: 24px; gap: 24px; }
+      .hero p.lead { margin: 14px 0 18px; }
+      .product-story { padding: 16px; border-radius: 20px; }
+      .product-story figcaption { margin-bottom: 10px; }
+      .product-story h2 { font-size: 22px; margin-bottom: 12px; }
+    }
 
   </style>
 
@@ -247,12 +253,12 @@
         <div>
           <p class="eyebrow">カレンダーで続ける、かんたん食事記録</p>
           <h1><span class="mark hero-phrase">「何食べたっけ？」を、</span><br><span class="hero-line">カレンダーで</span><br><span class="hero-line">ひと目に。</span></h1>
-          <p class="lead">朝・昼・晩に食べたものをタップで記録。カロリーは自動で合計、写真も残せます。週や月の振り返り、消費カロリーとの差から「あと何kg」の目安まで、ひとつのアプリで。</p>
+          <p class="lead">食事をタップで記録、カロリーは自動で合計。写真も残して、カレンダーで振り返れます。</p>
           <div class="cta">
             <a class="btn btn-primary" href="./app.html">無料ではじめる</a>
             <a class="link" href="#features">できることを見る</a>
           </div>
-          <p class="note">インストール不要。iPhone / Android のブラウザで開いて「ホーム画面に追加」するとアプリのように使えます。</p>
+          <p class="note">インストール不要。ホーム画面への追加もできます。</p>
         </div>
         <figure class="product-story" aria-label="食事カレンダーの利用イメージ">
           <figcaption>食べたものが、日々の記録になる。</figcaption>
