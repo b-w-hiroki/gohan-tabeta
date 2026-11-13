@@ -167,7 +167,7 @@ function drawWeightChart(box, from, to, byDate, tdee) {
       const key = addDays(from, i);
       if (key > last) break;
       const d = byDate[key];
-      if (d && dayTotal(d) > 0) bal += tdee + exerciseTotal(d) - dayTotal(d);
+      if (hasFoodRecord(d)) bal += tdee + exerciseTotal(d) - dayTotal(d);
       estimate.push({ i, v: measured[0].v - bal / KCAL_PER_KG });
     }
   }
