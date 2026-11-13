@@ -684,3 +684,7 @@ body.booting .topbar, body.booting .bottom-nav { visibility: hidden; }
 /* 1画面に収める画面の中では余白を詰める */
 .view > .ad-slot { margin: 4px auto 0; }
 .view > .ad-slot .ad-label { margin-bottom: 2px; }
+
+.food-empty { flex-direction: column; gap: 12px; padding: 12px; }
+.food-empty strong { color: var(--text); }
+.food-empty a { min-height: 44px; display: inline-flex; align-items: center; text-decoration: none; }

@@ -6,6 +6,8 @@ import {
 } from './util.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
+// A food item with 0 kcal is recorded; notes, photos, weight and water alone are not calorie data.
+const hasFoodRecord = (day) => !!day && dayItems(day).length > 0;
 const MAX_DAILY_BARS = 62; // Longer ranges are shown as weekly averages.
 
 // Period selection survives navigation within the session.
@@ -52,7 +54,7 @@ function buildBars(from, to, byDate) {
       const key = addDays(from, i);
       const rec = byDate[key];
       const v = rec ? dayTotal(rec) : 0;
-      bars.push({ key, from: key, to: key, value: v, recorded: v > 0 });
+      bars.push({ key, from: key, to: key, value: v, recorded: hasFoodRecord(rec) });
     }
     return { bars, unit: 'day' };
   }
@@ -62,7 +64,7 @@ function buildBars(from, to, byDate) {
       const key = addDays(start, i);
       if (key < from || key > to) continue;
       const v = byDate[key] ? dayTotal(byDate[key]) : 0;
-      if (v > 0) { sum += v; cnt++; }
+      if (hasFoodRecord(byDate[key])) { sum += v; cnt++; }
     }
     bars.push({ key: start, from: start < from ? from : start, to: addDays(start, 6) > to ? to : addDays(start, 6),
       value: cnt ? Math.round(sum / cnt) : 0, recorded: cnt > 0 });
@@ -110,7 +112,7 @@ function drawChart(box, bars, unit, goal, onSelect, selectedKey) {
   bars.forEach((b, i) => {
     const x = pad.l + i * slot + gap / 2;
     const g = svg('g', { class: `bar${b.value > goal ? ' over' : ''}${b.key === selectedKey ? ' selected' : ''}`, tabindex: 0,
-      role: 'button', 'aria-label': `${shortDate(b.from)} ${fmt(b.value)}kcal` });
+      role: 'button', 'aria-label': `${shortDate(b.from)} ${b.recorded ? `${fmt(b.value)}kcal` : '記録なし'}` });
     // Hit target: full column height, wider than the painted mark.
     g.append(svg('rect', { x: pad.l + i * slot, y: pad.t, width: slot, height: ih, class: 'hit' }));
     if (b.value > 0) {
@@ -165,7 +167,7 @@ function drawWeightChart(box, from, to, byDate, tdee) {
       const key = addDays(from, i);
       if (key > last) break;
       const d = byDate[key];
-      if (d && dayTotal(d) > 0) bal += tdee + exerciseTotal(d) - dayTotal(d);
+      if (hasFoodRecord(d)) bal += tdee + exerciseTotal(d) - dayTotal(d);
       estimate.push({ i, v: measured[0].v - bal / KCAL_PER_KG });
     }
   }
@@ -207,7 +209,7 @@ export async function renderDashboard(setHeader) {
   const { from, to, label } = currentRange();
   const days = await getDaysInRange(from, to);
   const byDate = Object.fromEntries(days.map((d) => [d.date, d]));
-  const totals = days.map(dayTotal).filter((v) => v > 0);
+  const totals = days.filter(hasFoodRecord).map(dayTotal);
   const recorded = totals.length;
   const sum = totals.reduce((a, b) => a + b, 0);
   const avg = recorded ? Math.round(sum / recorded) : 0;
@@ -216,14 +218,14 @@ export async function renderDashboard(setHeader) {
   // Energy balance on days with food records: (TDEE + exercise) - intake.
   const profile = getProfile();
   const tdee = isProfileComplete(profile) ? calcTdee(profile) : 0;
-  const balance = days.filter((d) => dayTotal(d) > 0)
+  const balance = days.filter(hasFoodRecord)
     .reduce((a, d) => a + tdee + exerciseTotal(d) - dayTotal(d), 0);
   const kg = balance / KCAL_PER_KG;
   const kgText = `${kg > 0 ? '-' : kg < 0 ? '+' : '±'}${Math.abs(kg).toFixed(Math.abs(kg) >= 1 ? 1 : 2)}kg`;
 
   // Average kcal per meal over recorded days.
   const mealAvg = MEAL_TYPES.map((t) => {
-    const s = days.filter((d) => dayTotal(d) > 0).reduce((a, d) => a + mealTotal(d.meals[t.id]), 0);
+    const s = days.filter(hasFoodRecord).reduce((a, d) => a + mealTotal(d.meals[t.id]), 0);
     return { ...t, value: recorded ? Math.round(s / recorded) : 0 };
   });
   const mealSum = mealAvg.reduce((a, m) => a + m.value, 0);
@@ -255,8 +257,8 @@ export async function renderDashboard(setHeader) {
 
   const kpi = (title, value, sub) => h('div', { class: 'stat' }, h('small', {}, title), h('strong', {}, value), sub ? h('small', {}, sub) : null);
   const kpis = h('div', { class: 'stats' },
-    kpi('1日平均', `${fmt(avg)}`, 'kcal'),
-    kpi('目標内の日', `${within}/${recorded}`, recorded ? `${Math.round((within / recorded) * 100)}%` : '日'),
+    kpi('1日平均', recorded ? fmt(avg) : '—', recorded ? 'kcal' : '記録なし'),
+    kpi('目標内の日', recorded ? `${within}/${recorded}` : '—', recorded ? `${Math.round((within / recorded) * 100)}%` : '記録なし'),
     tdee && recorded
       ? h('a', { class: `stat stat-link${kg > 0 ? ' loss' : ''}`, href: '#/stats', onclick: (e) => { e.preventDefault(); toggleBalance(); } },
         h('small', {}, '推定減量'), h('strong', {}, kgText), h('small', {}, `${balance > 0 ? '-' : '+'}${fmt(Math.abs(Math.round(balance)))}kcal`))
@@ -266,7 +268,7 @@ export async function renderDashboard(setHeader) {
           h('small', {}, '推定減量'), h('strong', {}, '—'), h('small', {}, '基本情報を入力')));
 
   // Tapping the estimate shows how it was calculated.
-  const exSum = days.filter((d) => dayTotal(d) > 0).reduce((a, d) => a + exerciseTotal(d), 0);
+  const exSum = days.filter(hasFoodRecord).reduce((a, d) => a + exerciseTotal(d), 0);
   const balanceNote = h('p', { class: 'balance-note', hidden: true },
     `記録${recorded}日: 消費 ${fmt(tdee * recorded)} + 運動 ${fmt(exSum)} − 摂取 ${fmt(sum)} = ${fmt(Math.round(balance))}kcal ÷ ${fmt(KCAL_PER_KG)}kcal/kg（食事未記録の日は除外）`);
   function toggleBalance() { balanceNote.hidden = !balanceNote.hidden; }
@@ -280,7 +282,7 @@ export async function renderDashboard(setHeader) {
     selectedKey = b ? b.key : null;
     if (!b) {
       readout.replaceChildren(h('span', { class: 'muted' },
-        `目標 ${fmt(goal)}kcal・${unit === 'week' ? '記録日の週平均・' : ''}棒をタップで詳細`));
+        recorded ? `目標 ${fmt(goal)}kcal・${unit === 'week' ? '記録日の週平均・' : ''}棒をタップで詳細` : '食事を記録すると、ここに推移が表示されます'));
       return;
     }
     const when = b.from === b.to ? `${shortDate(b.from)}(${WEEKDAYS[fromKey(b.from).getDay()]})` : `${shortDate(b.from)}〜${shortDate(b.to)} 平均`;
@@ -290,9 +292,17 @@ export async function renderDashboard(setHeader) {
       b.from === b.to ? h('a', { class: 'readout-link', href: `#/day/${b.from}` }, 'この日を開く ›') : null);
   };
   const isWeight = state.chart === 'weight';
-  const draw = () => (isWeight
+  const draw = () => {
+    if (!isWeight && !recorded) {
+      chartBox.replaceChildren(h('div', { class: 'chart-empty food-empty' },
+        h('strong', {}, 'この期間の食事記録はありません'),
+        h('a', { class: 'btn primary', href: `#/day/${todayKey()}` }, '今日の食事を記録')));
+      return;
+    }
+    return (isWeight
     ? drawWeightChart(chartBox, from, to, byDate, tdee)
     : drawChart(chartBox, bars, unit, goal, (b) => { showReadout(b); draw(); }, selectedKey));
+  };
   if (isWeight) {
     const ws = days.filter((d) => d.weight).sort((a, b) => (a.date < b.date ? -1 : 1));
     const change = ws.length > 1 ? round1(ws[ws.length - 1].weight - ws[0].weight) : null;
@@ -320,11 +330,11 @@ export async function renderDashboard(setHeader) {
 
   // Share of each meal as one stacked bar, with the values underneath.
   const meals = h('div', { class: 'meal-split' },
-    h('div', { class: 'meal-stack', role: 'img', 'aria-label': mealAvg.map((m) => `${m.label}${fmt(m.value)}kcal`).join('、') },
+    h('div', { class: 'meal-stack', role: 'img', 'aria-label': recorded ? mealAvg.map((m) => `${m.label}${fmt(m.value)}kcal`).join('、') : '食事の記録なし' },
       mealSum ? mealAvg.filter((m) => m.value > 0).map((m) => h('span', { class: `dot-${m.id}`, style: `flex:${m.value}` })) : null),
     h('div', { class: 'meal-values' },
       mealAvg.map((m) => h('span', { class: 'meal-value' },
-        h('small', {}, h('i', { class: `dot dot-${m.id}` }), m.label), h('b', {}, fmt(m.value))))));
+        h('small', {}, h('i', { class: `dot dot-${m.id}` }), m.label), h('b', {}, recorded ? fmt(m.value) : '—')))));
 
   const view = h('div', { class: 'view dash-view' },
     seg, periodRow, kpis, balanceNote,
