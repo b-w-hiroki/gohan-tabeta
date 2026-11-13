@@ -79,7 +79,7 @@
     .link { display: inline-flex; align-items: center; min-height: 44px; font-weight: 700; }
 
     /* hero */
-    .hero { padding: 44px 0 24px; display: grid; gap: 32px; align-items: center; }
+    .hero { padding: 44px 0 24px; display: grid; gap: 32px; align-items: start; }
     .hero > div:first-child { min-width: 0; }
     .eyebrow { margin: 0 0 12px; font-weight: 700; font-size: 14px; color: var(--muted); letter-spacing: .04em; }
     .hero h1 { margin: 0; font-family: var(--font-brand); font-weight: 900; font-size: clamp(24px, 7.2vw, 44px); line-height: 1.35; letter-spacing: .01em; }
@@ -185,10 +185,16 @@
     .story-steps small { display: block; font-size: 13px; line-height: 1.7; }
     .story-amount { font-variant-numeric: tabular-nums; font-size: 28px; font-weight: 800; }
     .story-status { display: inline-block; padding: 3px 10px; border: 1px solid currentColor; border-radius: 99px; font-size: 12px; }
-    .story-calendar { border: 1px solid var(--line, var(--border)); border-radius: 16px; overflow: hidden; }
+    .story-calendar { aspect-ratio: 1.5; border: 1px solid var(--line, var(--border)); border-radius: 16px; overflow: hidden; }
     .story-calendar img { display: block; width: 100%; height: auto; }
     .story-milk { width: 64px; height: 64px; float: right; margin-left: 12px; }
-    @media (max-width: 480px) { .product-story { padding: 20px; border-radius: 20px; } }
+    @media (max-width: 480px) {
+      .hero { padding-top: 24px; gap: 24px; }
+      .hero p.lead { margin: 14px 0 18px; }
+      .product-story { padding: 16px; border-radius: 20px; }
+      .product-story figcaption { margin-bottom: 10px; }
+      .product-story h2 { font-size: 22px; margin-bottom: 12px; }
+    }
 
   </style>
 
@@ -247,18 +253,18 @@
         <div>
           <p class="eyebrow">カレンダーで続ける、かんたん食事記録</p>
           <h1><span class="mark hero-phrase">「何食べたっけ？」を、</span><br><span class="hero-line">カレンダーで</span><br><span class="hero-line">ひと目に。</span></h1>
-          <p class="lead">朝・昼・晩に食べたものをタップで記録。カロリーは自動で合計、写真も残せます。週や月の振り返り、消費カロリーとの差から「あと何kg」の目安まで、ひとつのアプリで。</p>
+          <p class="lead">食事をタップで記録、カロリーは自動で合計。写真も残して、カレンダーで振り返れます。</p>
           <div class="cta">
             <a class="btn btn-primary" href="./app.html">無料ではじめる</a>
             <a class="link" href="#features">できることを見る</a>
           </div>
-          <p class="note">インストール不要。iPhone / Android のブラウザで開いて「ホーム画面に追加」するとアプリのように使えます。</p>
+          <p class="note">インストール不要。ホーム画面への追加もできます。</p>
         </div>
         <figure class="product-story" aria-label="食事カレンダーの利用イメージ">
           <figcaption>食べたものが、日々の記録になる。</figcaption>
           <h2>あの日のごはんを、<br>カレンダーから。</h2>
           <div class="story-calendar"><img src="images/screen-calendar.jpg" alt="食事記録を日付ごとに振り返るカレンダーのサンプル画面" width="390" height="664" fetchpriority="high"></div>
-          <p class="story-note">画面はサンプルです。食事の内容や写真を残して、週・月で振り返れます。</p>
+          <p class="story-note">画面はサンプルの一部です。月全体の画面は下の機能紹介で確認できます。</p>
         </figure>
       </div>
     </div>
